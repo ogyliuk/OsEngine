@@ -243,6 +243,12 @@ namespace OsEngine.Market.Servers
         void CancelAllOrders();
 
         /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        void UpdateDepositBalance();
+
+        /// <summary>
         /// order changed
         /// изменился ордер
         /// </summary>

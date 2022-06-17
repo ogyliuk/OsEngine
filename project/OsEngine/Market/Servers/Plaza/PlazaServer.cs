@@ -95,6 +95,15 @@ namespace OsEngine.Market.Servers.Plaza
 
         }
 
+        /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
         public void Subscrible(Security security)
         {
             _plazaController.StartMarketDepth(security);

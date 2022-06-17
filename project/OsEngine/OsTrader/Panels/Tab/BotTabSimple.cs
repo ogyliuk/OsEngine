@@ -2609,6 +2609,24 @@ namespace OsEngine.OsTrader.Panels.Tab
         }
 
         /// <summary>
+        /// read actual balance from exchange and update this value in local storage
+        /// считать текущий баланс с биржи и обновить его значение в локальном хранилище
+        /// </summary>
+        public void UpdateDepositBalance(Position position)
+        {
+            OlegUtils.Log("Position {0} {1} has benn CLOSED. Going to update deposit balance.", 
+                position.NameBot, position.SecurityName);
+            if (StartProgram == StartProgram.IsOsTrader)
+            {
+                _connector.UpdateDepositBalance();
+            }
+            else
+            {
+                OlegUtils.Log("Can't update deposit balance because START PROGRAM is not an IsOsTrader");
+            }
+        }
+
+        /// <summary>
         /// withdraw all orders from the system associated with this transaction / 
         /// отозвать все ордера из системы, связанные с этой сделкой
         /// </summary>
@@ -3842,6 +3860,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (position.State == PositionStateType.Done)
                 {
                     CloseAllOrderToPosition(position);
+                    UpdateDepositBalance(position);
 
                     if (PositionClosingSuccesEvent != null)
                     {
@@ -3879,6 +3898,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 {
                     if (StartProgram != StartProgram.IsOsOptimizer)
                     {
+                        OlegUtils.Log("{0} opened new position with VOLUME = {1}", TabName + OsLocalization.Trader.Label73, position.OpenVolume);
                         SetNewLogMessage(TabName + OsLocalization.Trader.Label73 + position.Number, LogMessageType.Trade);
                     }
                         

@@ -1985,6 +1985,15 @@ namespace OsEngine.Market.Servers.SmartCom
 
         }
 
+        /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
         private List<Order> _ordersWhithId = new List<Order>();
 
         private List<Order> _orderWhithMarketId = new List<Order>();

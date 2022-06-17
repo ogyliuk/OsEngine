@@ -785,6 +785,7 @@
     <Compile Include="Market\Services\CandlesCreator.cs" />
     <Compile Include="Market\Services\RestChannel.cs" />
     <Compile Include="Market\Services\WsSource.cs" />
+    <Compile Include="OlegUtils.cs" />
     <Compile Include="OsConverter\OsCandleConverterUi.xaml.cs">
       <DependentUpon>OsCandleConverterUi.xaml</DependentUpon>
     </Compile>

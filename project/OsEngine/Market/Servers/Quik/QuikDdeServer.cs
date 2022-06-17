@@ -674,6 +674,15 @@ namespace OsEngine.Market.Servers.Quik
         }
 
         /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
+        /// <summary>
         /// take order status
         /// взять статус ордеров
         /// </summary>

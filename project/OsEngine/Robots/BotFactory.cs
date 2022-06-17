@@ -287,6 +287,13 @@ namespace OsEngine.Robots
             return bot;
         }
 
+        public static Type GetBotTypeByName(string className)
+        {
+            BotPanel botPanel = _serializedPanels != null ? 
+                _serializedPanels.FirstOrDefault(p => p.GetType().Name == className) : null;
+            return botPanel != null ? botPanel.GetType() : null;
+        }
+
         static Dictionary<string, Type> GetTypesWithBotAttribute()
         {
             Assembly assembly = Assembly.GetAssembly(typeof(BotPanel));

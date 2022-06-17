@@ -1451,6 +1451,15 @@ namespace OsEngine.Market.Servers.Finam
         }
 
         /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
+        /// <summary>
         /// called when new order appear in the system
         /// вызывается когда в системе появляется новый ордер
         /// </summary>

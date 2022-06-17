@@ -536,6 +536,15 @@ namespace OsEngine.Market.Servers.Transaq
         }
 
         /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
+        /// <summary>
         /// subscribe to get ticks and depth by instrument
         /// подписаться на получение тиков и стаканов по инструменту
         /// </summary>

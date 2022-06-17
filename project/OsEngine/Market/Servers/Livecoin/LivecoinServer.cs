@@ -174,6 +174,15 @@ namespace OsEngine.Market.Servers.Livecoin
 
         }
 
+        /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
         public void Subscrible(Security security)
         {
             _client.Subscribe(security.Name.Replace('_','/'));
