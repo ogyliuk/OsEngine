@@ -239,6 +239,15 @@ namespace OsEngine.Market.Servers.Hitbtc
 
         }
 
+        /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
         #endregion
 
         #region parsing incoming data / разбор входящих данных

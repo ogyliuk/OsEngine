@@ -1410,6 +1410,30 @@ namespace OsEngine.Market.Connectors
             }
         }
 
+        /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+            try
+            {
+                if (_myServer != null && _myServer.ServerType != ServerType.Finam && !EmulatorIsOn)
+                {
+                    _myServer.UpdateDepositBalance();
+                }
+                else
+                {
+                    OlegUtils.Log("Can't update deposit balance because mode is not relevant");
+                }
+            }
+            catch (Exception error)
+            {
+                OlegUtils.Log("Failed to update deposit balance. Details: {0}", error.ToString());
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
         // outgoing events
         // Исходящие события
 

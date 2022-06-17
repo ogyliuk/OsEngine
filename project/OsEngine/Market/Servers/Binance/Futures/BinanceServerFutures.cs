@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using OsEngine.Entity;
 using OsEngine.Language;
@@ -10,6 +11,7 @@ using OsEngine.Logging;
 using OsEngine.Market.Servers.Binance.Futures.Entity;
 using OsEngine.Market.Servers.Binance.Spot.BinanceSpotEntity;
 using OsEngine.Market.Servers.Entity;
+using OsEngine.Robots;
 
 namespace OsEngine.Market.Servers.Binance.Futures
 {
@@ -197,6 +199,89 @@ namespace OsEngine.Market.Servers.Binance.Futures
         public void CancelAllOrders()
         {
 
+        }
+
+        /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+            try
+            {
+                Thread.Sleep(1000);
+                OlegUtils.Log("Going to read deposit balance from Exchange");
+
+                AccountResponseFutures accountObject = _client.GetBalance();
+                if (accountObject != null && accountObject.assets != null)
+                {
+                    OlegUtils.Log("Got account info");
+                    AssetFutures usdtAssetObject = accountObject.assets.FirstOrDefault(assetObject => assetObject.asset.ToUpper() == "USDT");
+                    if (usdtAssetObject != null)
+                    {
+                        decimal availableBalanceUSDT = Convert.ToDecimal(usdtAssetObject.availableBalance);
+                        OlegUtils.Log("Current DEPO BALANCE = {0} USDT", availableBalanceUSDT);
+                        UpdateDepositBalanceForAllRobots(availableBalanceUSDT);
+                    }
+                    else
+                    {
+                        OlegUtils.Log("Can't find USDT DEPOSIT BALANCE in account info");
+                    }
+                }
+                else
+                {
+                    OlegUtils.Log("Can't read DEPOSIT BALANCE...");
+                }
+            }
+            catch (Exception ex)
+            {
+                OlegUtils.Log("ERROR during update of DEPOSIT BALANCE. Details: {0}", ex.Message);
+            }
+        }
+
+        private void UpdateDepositBalanceForAllRobots(decimal deposit)
+        {
+            const string MASTER_BOT_CLASSIC_CLASS_NAME = "MasterBotClassic";
+            const string STATIC_PORTFOLIO_VALUE_PROPERTY_NAME = "StaticPortfolioValue";
+            const string SAVE_STATIC_PORTFOLIO_METHOD_NAME = "SaveStaticPortfolio";
+
+            try
+            {
+                OlegUtils.Log("Setting DEPOSIT BALANCE = {0} USDT to ALL robots", deposit);
+                Type masterBotClassicType = BotFactory.GetBotTypeByName(MASTER_BOT_CLASSIC_CLASS_NAME);
+                if (masterBotClassicType != null)
+                {
+                    PropertyInfo staticPortfolioValuePropertyInfo = masterBotClassicType.GetProperty(STATIC_PORTFOLIO_VALUE_PROPERTY_NAME);
+                    if (staticPortfolioValuePropertyInfo != null)
+                    {
+                        staticPortfolioValuePropertyInfo.SetValue(null, deposit);
+                        OlegUtils.Log("DEPOSIT BALANCE is set for all robots");
+                    }
+                    else
+                    {
+                        OlegUtils.Log("Can't find {0} PROPERTY info", STATIC_PORTFOLIO_VALUE_PROPERTY_NAME);
+                    }
+
+                    MethodInfo saveStaticPortfolioMethodInfo = masterBotClassicType.GetMethod(SAVE_STATIC_PORTFOLIO_METHOD_NAME, BindingFlags.Static | BindingFlags.NonPublic);
+                    if (saveStaticPortfolioMethodInfo != null)
+                    {
+                        saveStaticPortfolioMethodInfo.Invoke(null, null);
+                        OlegUtils.Log("DEPOSIT BALANCE is set in GLOBAL settings");
+                    }
+                    else
+                    {
+                        OlegUtils.Log("Can't find {0} METHOD info", SAVE_STATIC_PORTFOLIO_METHOD_NAME);
+                    }
+                }
+                else
+                {
+                    OlegUtils.Log("Can't find {0} METHOD info", MASTER_BOT_CLASSIC_CLASS_NAME);
+                }
+            }
+            catch (Exception ex)
+            {
+                OlegUtils.Log("ERROR during update of DEPOSIT BALANCE for ALL robots. Details: {0}", ex.Message);
+            }
         }
 
         /// <summary>

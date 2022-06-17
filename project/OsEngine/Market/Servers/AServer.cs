@@ -2098,6 +2098,15 @@ namespace OsEngine.Market.Servers
         }
 
         /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+            ServerRealization.UpdateDepositBalance();
+        }
+
+        /// <summary>
         /// order changed
         /// изменился ордер
         /// </summary>

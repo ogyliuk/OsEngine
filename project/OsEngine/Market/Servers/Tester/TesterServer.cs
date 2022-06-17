@@ -3809,6 +3809,15 @@ namespace OsEngine.Market.Servers.Tester
         }
 
         /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
+        /// <summary>
 		/// updated order on the exchange
         /// обновился ордер на бирже
         /// </summary>

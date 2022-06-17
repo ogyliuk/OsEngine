@@ -734,6 +734,15 @@ namespace OsEngine.Market.Servers.QuikLua
 
         }
 
+        /// <summary>
+        /// Read available balance from exchange and save it to local storage
+        /// Метод считывает и обновляет размер депозита
+        /// </summary>
+        public void UpdateDepositBalance()
+        {
+
+        }
+
         private List<string> subscribedBook = new List<string>();
 
         public void Subscrible(Security security)
