@@ -2614,15 +2614,10 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// </summary>
         public void UpdateDepositBalance(Position position)
         {
-            OlegUtils.Log("Position {0} {1} has benn CLOSED. Going to update deposit balance.", 
-                position.NameBot, position.SecurityName);
             if (StartProgram == StartProgram.IsOsTrader)
             {
+                OlegUtils.Log("Position {0} {1} has benn CLOSED. Going to update deposit balance.", position.NameBot, position.SecurityName);
                 _connector.UpdateDepositBalance();
-            }
-            else
-            {
-                OlegUtils.Log("Can't update deposit balance because START PROGRAM is not an IsOsTrader");
             }
         }
 
@@ -3898,10 +3893,13 @@ namespace OsEngine.OsTrader.Panels.Tab
                 {
                     if (StartProgram != StartProgram.IsOsOptimizer)
                     {
-                        OlegUtils.Log("{0} opened new position with VOLUME = {1}", TabName + OsLocalization.Trader.Label73, position.OpenVolume);
                         SetNewLogMessage(TabName + OsLocalization.Trader.Label73 + position.Number, LogMessageType.Trade);
                     }
-                        
+                    if (StartProgram == StartProgram.IsOsTrader)
+                    {
+                        OlegUtils.Log("{0} opened new position with VOLUME = {1}", TabName + OsLocalization.Trader.Label73, position.OpenVolume);
+                    }
+
                     if (PositionOpeningSuccesEvent != null)
                     {
                         PositionOpeningSuccesEvent(position);
