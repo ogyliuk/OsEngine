@@ -1667,6 +1667,7 @@
     <EmbeddedResource Include="Resources\OsEngine_logo_transpared.png" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="APIsToConsume.txt" />
     <Content Include="lua\clibs\lua51.dll" />
     <Content Include="lua\clibs\socket\core.dll" />
   </ItemGroup>
