@@ -23,6 +23,8 @@ using OsEngine.Robots.Patterns;
 using OsEngine.Robots.Trend;
 using OsEngine.Robots.OnScriptIndicators;
 using OsEngine.Robots.Screeners;
+using OsEngine.Robots.Oleg.Good;
+using OsEngine.Robots.Oleg;
 
 namespace OsEngine.Robots
 {
@@ -75,6 +77,9 @@ namespace OsEngine.Robots
             result.Add("PriceChannelVolatility");
             result.Add("RsiTrade");
             result.Add("RviTrade");
+            result.Add("MyEnvelopTrend");
+            result.Add("MyBollingerTrend");
+            result.Add("MyBollingerContrTrend");
             result.AddRange(BotsWithAttribute.Keys);
 
             List<string> resultTrue = new List<string>();
@@ -272,6 +277,18 @@ namespace OsEngine.Robots
             if (nameClass == "PairTraderSpreadSma")
             {
                 bot = new PairTraderSpreadSma(name, startProgram);
+            }
+            if (nameClass == "MyEnvelopTrend")
+            {
+                bot = new MyEnvelopTrend(name, startProgram);
+            }
+            if (nameClass == "MyBollingerTrend")
+            {
+                bot = new MyBollingerTrend(name, startProgram);
+            }
+            if (nameClass == "MyBollingerContrTrend")
+            {
+                bot = new MyBollingerContrTrend(name, startProgram);
             }
             if (BotsWithAttribute.ContainsKey(nameClass))
             {
