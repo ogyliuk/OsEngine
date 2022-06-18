@@ -2616,7 +2616,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         {
             if (StartProgram == StartProgram.IsOsTrader)
             {
-                OlegUtils.Log("Position {0} {1} has benn CLOSED. Going to update deposit balance.", position.NameBot, position.SecurityName);
+                OlegUtils.Log("Position {0} {1} has been CLOSED. Going to update deposit balance.", position.NameBot, position.SecurityName);
                 _connector.UpdateDepositBalance();
             }
         }
