@@ -9,7 +9,6 @@ using System.Windows;
 using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Entity;
 using OsEngine.Language;
-using OsEngine.Market;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Tab;
 
@@ -21,6 +20,8 @@ namespace OsEngine.Robots.Trend
     /// </summary>
     public class StrategyBillWilliams : BotPanel
     {
+        private bool ignoreTime = true;
+
         public StrategyBillWilliams(string name, StartProgram startProgram)
             : base(name, startProgram)
         {
@@ -189,8 +190,8 @@ namespace OsEngine.Robots.Trend
                 return;
             }
 
-            if (StartProgram == StartProgram.IsOsTrader
-                && DateTime.Now.Hour < 10)
+            bool timeCheckPassed1 = ignoreTime || DateTime.Now.Hour < 10;
+            if (StartProgram == StartProgram.IsOsTrader && timeCheckPassed1)
             {
                 return;
             }
@@ -250,8 +251,9 @@ namespace OsEngine.Robots.Trend
 
             List<Position> openPosition = _tab.PositionsOpenAll;
 
-            if (openPosition != null && openPosition.Count != 0
-                && candles[candles.Count - 1].TimeStart.Hour <= 18)
+
+            bool timeCheckPassed2 = ignoreTime || candles[candles.Count - 1].TimeStart.Hour <= 18;
+            if (openPosition != null && openPosition.Count != 0 && timeCheckPassed2)
             {
                 for (int i = 0; i < openPosition.Count; i++)
                 {
@@ -264,9 +266,8 @@ namespace OsEngine.Robots.Trend
                 return;
             }
 
-            if (openPosition == null || openPosition.Count == 0
-                && candles[candles.Count - 1].TimeStart.Hour >= 11
-                && candles[candles.Count - 1].TimeStart.Hour <= 18)
+            bool timeCheckPassed3 = ignoreTime || (candles[candles.Count - 1].TimeStart.Hour >= 11 && candles[candles.Count - 1].TimeStart.Hour <= 18);
+            if ((openPosition == null || openPosition.Count == 0) && timeCheckPassed3)
             {
                 LogicOpenPosition();
             }
@@ -274,7 +275,7 @@ namespace OsEngine.Robots.Trend
                      && candles[candles.Count - 1].TimeStart.Hour >= 11
                      && candles[candles.Count - 1].TimeStart.Hour <= 18)
             {
-                LogicOpenPositionSecondary(openPosition[0].Direction);
+                // LogicOpenPositionSecondary(openPosition[0].Direction);
             }
 
 
@@ -286,15 +287,18 @@ namespace OsEngine.Robots.Trend
         /// </summary>
         private void LogicOpenPosition()
         {
-            if (_lastPrice > _lastUpAlligator && _lastPrice > _lastMiddleAlligator && _lastPrice > _lastDownAlligator
-                && _lastPrice > _lastFractalUp
-                && Regime.ValueString != "OnlyShort")
+            bool conLong1 = _lastUpAlligator >= _lastMiddleAlligator && _lastMiddleAlligator >= _lastDownAlligator;
+            bool conLong2 = _lastPrice > _lastUpAlligator;
+            bool conLong3 = _lastPrice > _lastFractalUp;
+            if (conLong1 && conLong2 && Regime.ValueString != "OnlyShort")
             {
                 _tab.BuyAtLimit(VolumeFirst.ValueDecimal, _lastPrice + Slippage.ValueInt * _tab.Securiti.PriceStep);
             }
-            if (_lastPrice < _lastUpAlligator && _lastPrice < _lastMiddleAlligator && _lastPrice < _lastDownAlligator
-                && _lastPrice < _lastFractalDown
-                && Regime.ValueString != "OnlyLong")
+
+            bool conShort1 = _lastUpAlligator <= _lastMiddleAlligator && _lastMiddleAlligator <= _lastDownAlligator;
+            bool conShort2 = _lastPrice < _lastUpAlligator;
+            bool conShort3 = _lastPrice < _lastFractalDown;
+            if (conShort1 && conShort2 && Regime.ValueString != "OnlyLong")
             {
                 _tab.SellAtLimit(VolumeFirst.ValueDecimal, _lastPrice - Slippage.ValueInt * _tab.Securiti.PriceStep);
             }
@@ -338,7 +342,8 @@ namespace OsEngine.Robots.Trend
 
             if (position.Direction == Side.Buy)
             {
-                if (_lastPrice < _lastMiddleAlligator)
+                //if (_lastPrice < _lastMiddleAlligator)
+                if (_lastUpAlligator <= _lastMiddleAlligator && _lastMiddleAlligator <= _lastDownAlligator)
                 {
                     _tab.CloseAtLimit(position, _lastPrice - Slippage.ValueInt * _tab.Securiti.PriceStep, position.OpenVolume);
                 }
@@ -346,7 +351,8 @@ namespace OsEngine.Robots.Trend
 
             if (position.Direction == Side.Sell)
             {
-                if (_lastPrice > _lastMiddleAlligator)
+                // if (_lastPrice > _lastMiddleAlligator)
+                if (_lastUpAlligator >= _lastMiddleAlligator && _lastMiddleAlligator >= _lastDownAlligator)
                 {
                     _tab.CloseAtLimit(position, _lastPrice + Slippage.ValueInt * _tab.Securiti.PriceStep, position.OpenVolume);
                 }
