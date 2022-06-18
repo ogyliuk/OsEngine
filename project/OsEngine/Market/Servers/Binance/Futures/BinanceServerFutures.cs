@@ -219,7 +219,14 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     AssetFutures usdtAssetObject = accountObject.assets.FirstOrDefault(assetObject => assetObject.asset.ToUpper() == "USDT");
                     if (usdtAssetObject != null)
                     {
-                        decimal availableBalanceUSDT = Convert.ToDecimal(usdtAssetObject.availableBalance);
+                        string balanceString = usdtAssetObject.availableBalance;
+                        if (!String.IsNullOrWhiteSpace(balanceString))
+                        {
+                            string decimalSeparator = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+                            string symbolToReplace = decimalSeparator == "." ? "," : ".";
+                            balanceString = balanceString.Replace(symbolToReplace, decimalSeparator);
+                        }
+                        decimal availableBalanceUSDT = Convert.ToDecimal(balanceString);
                         OlegUtils.Log("Current DEPO BALANCE = {0} USDT", availableBalanceUSDT);
                         UpdateDepositBalanceForAllRobots(availableBalanceUSDT);
                     }
