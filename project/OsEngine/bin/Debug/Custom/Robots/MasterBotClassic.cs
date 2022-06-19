@@ -968,7 +968,7 @@ namespace OsEngine.Robots.FoundBots
                     decimal redLine = stops[i].PriceRedLine - stops[i].PriceRedLine * ShiftToStopOpdersValue.ValueDecimal / 100;
 
                     tab.BuyAtStop(
-                        GetVolume(),
+                        GetBuyVolume(),
                         redLine + (SlippageInter.ValueDecimal * redLine / 100),
                         redLine,
                         stops[i].ActivateType, stops[i].TimeCreate.ToString());
@@ -982,7 +982,7 @@ namespace OsEngine.Robots.FoundBots
                     decimal redLine = stops[i].PriceRedLine + stops[i].PriceRedLine * ShiftToStopOpdersValue.ValueDecimal / 100;
 
                     tab.SellAtStop(
-                        GetVolume(),
+                        GetSellVolume(),
                         redLine - (SlippageInter.ValueDecimal * redLine / 100),
                         redLine,
                         stops[i].ActivateType, stops[i].TimeCreate.ToString());
@@ -1082,7 +1082,7 @@ namespace OsEngine.Robots.FoundBots
                 {
                     _numsPositionAlreadyUsed.Add(pos);
 
-                    Position myPos = tab.BuyAtLimit(GetVolume(),
+                    Position myPos = tab.BuyAtLimit(GetBuyVolume(),
                         pos.EntryPrice + (SlippageInter.ValueDecimal * pos.EntryPrice / 100), pos.TimeOpen.ToString());
                     _positionsToSupportOpenFirstTime.Add(myPos);
                     TabsSimple[0].SetNewLogMessage("В позиции на сопровождение новый лонг" + pos.Number, LogMessageType.System);
@@ -1097,7 +1097,7 @@ namespace OsEngine.Robots.FoundBots
                     && CanReOpen(pos, tab))
                 {
                     _numsPositionAlreadyUsed.Add(pos);
-                    Position myPos = tab.SellAtLimit(GetVolume(),
+                    Position myPos = tab.SellAtLimit(GetSellVolume(),
                         pos.EntryPrice - (SlippageInter.ValueDecimal * pos.EntryPrice / 100), pos.TimeOpen.ToString());
                     _positionsToSupportOpenFirstTime.Add(myPos);
                     TabsSimple[0].SetNewLogMessage("В позиции на сопровождение новый шорт" + pos.Number, LogMessageType.System);
@@ -1280,7 +1280,7 @@ namespace OsEngine.Robots.FoundBots
                     }
 
                     price += (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
-                    Position posMy = tab.BuyAtLimit(GetVolume(), price, pos.TimeOpen.ToString());
+                    Position posMy = tab.BuyAtLimit(GetBuyVolume(), price, pos.TimeOpen.ToString());
 
                     if (posMy != null)
                     {
@@ -1309,7 +1309,7 @@ namespace OsEngine.Robots.FoundBots
                     }
 
                     price -= (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
-                    Position posMy = tab.SellAtLimit(GetVolume(), price, pos.TimeOpen.ToString());
+                    Position posMy = tab.SellAtLimit(GetSellVolume(), price, pos.TimeOpen.ToString());
                     if (posMy != null)
                     {
                         _positionsToSupportOpenFirstTime.Add(posMy);
@@ -1320,25 +1320,54 @@ namespace OsEngine.Robots.FoundBots
 
         List<Position> _numsPositionAlreadyUsed = new List<Position>();
 
-        private decimal GetVolume()
+        private decimal GetBuyVolume()
+        {
+            return GetVolume(Side.Buy);
+        }
+
+        private decimal GetSellVolume()
+        {
+            return GetVolume(Side.Sell);
+        }
+
+        private decimal GetVolume(Side side)
         {
             decimal volume = VolumeOnPosition.ValueDecimal;
             // "Кол-во контрактов", "Валюта контракта", "% от Общего объёма портфеля"
 
-            if (VolumeRegime.ValueString == "Валюта контракта")
+            VolumeRegimeType volumeRegimeType = GetVolumeRegimeType();
+            if (volumeRegimeType == VolumeRegimeType.CONTRACT_CURRENCY || volumeRegimeType == VolumeRegimeType.PORTFOLIO_PERCENT)
             {
-                decimal contractPrice = TabsSimple[0].PriceBestAsk;
-                volume = Math.Round(VolumeOnPosition.ValueDecimal / contractPrice, VolumeDecimals.ValueInt);
-            }
-            else if (VolumeRegime.ValueString == "% от Общего объёма портфеля")
-            {
-                decimal contractPrice = TabsSimple[0].PriceBestAsk;
-                volume = Math.Round(
-                    (StaticPortfolioValue * (VolumeOnPosition.ValueDecimal / 100)) / contractPrice,
-                    VolumeDecimals.ValueInt);
+                decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
+                decimal slippage = price * SlippageInter.ValueDecimal / 100;
+                price = side == Side.Buy ? price + slippage : price - slippage;
+
+                if (volumeRegimeType == VolumeRegimeType.CONTRACT_CURRENCY)
+                {
+                    volume = Math.Round(volume / price, VolumeDecimals.ValueInt);
+                }
+                else if (volumeRegimeType == VolumeRegimeType.PORTFOLIO_PERCENT)
+                {
+                    decimal portfolioPercent = VolumeOnPosition.ValueDecimal;
+                    volume = Math.Round(StaticPortfolioValue / 100 * portfolioPercent / price, VolumeDecimals.ValueInt);
+                }
             }
 
             return volume;
+        }
+
+        private VolumeRegimeType GetVolumeRegimeType()
+        {
+            VolumeRegimeType volumeRegimeType = VolumeRegimeType.CONTRACTS_NUMBER;
+            if (VolumeRegime.ValueString == "Валюта контракта")
+            {
+                volumeRegimeType = VolumeRegimeType.CONTRACT_CURRENCY;
+            }
+            else if (VolumeRegime.ValueString == "% от Общего объёма портфеля")
+            {
+                volumeRegimeType = VolumeRegimeType.PORTFOLIO_PERCENT;
+            }
+            return volumeRegimeType;
         }
 
         #endregion
@@ -2194,5 +2223,12 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
+    }
+
+    internal enum VolumeRegimeType
+    {
+        CONTRACTS_NUMBER,
+        CONTRACT_CURRENCY,
+        PORTFOLIO_PERCENT
     }
 }
