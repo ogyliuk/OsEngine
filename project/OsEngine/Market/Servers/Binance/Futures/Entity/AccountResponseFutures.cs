@@ -47,7 +47,7 @@ namespace OsEngine.Market.Servers.Binance.Futures.Entity
         public string initialMargin;
         public string maintMargin;
         public string marginBalance;
-        public string availableBalance;
+        public string crossWalletBalance;
         public string maxWithdrawAmount;
         public string openOrderInitialMargin;
         public string positionInitialMargin;
