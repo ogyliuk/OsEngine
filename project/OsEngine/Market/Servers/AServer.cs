@@ -118,7 +118,7 @@ namespace OsEngine.Market.Servers
 
         private object trades_locker = new object();
 
-        private double _waitTimeAfterFirstStart = 0;
+        private double _waitTimeAfterFirstStart = 60;
 
         /// <summary>
         /// время ожиадания после старта сервера, по прошествии которого можно выставлять ордера
