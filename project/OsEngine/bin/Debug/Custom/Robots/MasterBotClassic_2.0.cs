@@ -390,7 +390,7 @@ namespace OsEngine.Robots.FoundBots
 
                 _storageLast = CreateNewStorage(tabs);
 
-                //TabsSimple[0].SetNewLogMessage("StorageCreate " + (DateTime.Now - timeStartStorageCreate).ToString(), LogMessageType.System);
+                TabsSimple[0].SetNewLogMessage("StorageCreate " + (DateTime.Now - timeStartStorageCreate).ToString(), LogMessageType.System);
 
                 DateTime timeStartWaiting = DateTime.Now;
 
@@ -405,35 +405,31 @@ namespace OsEngine.Robots.FoundBots
                     }
                 }
 
-                //TabsSimple[0].SetNewLogMessage("WaitingSecurities" + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
+                TabsSimple[0].SetNewLogMessage("WaitingSecurities" + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
 
                 timeStartWaiting = DateTime.Now;
 
                 _serverLast = CreateNewServer(_storageLast, _storageLast.TimeStart, _storageLast.TimeEnd.AddHours(2));
 
 
-                //TabsSimple[0].SetNewLogMessage("Server creation Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
+                TabsSimple[0].SetNewLogMessage("Server creation Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
 
                 timeStartWaiting = DateTime.Now;
 
                 BotPanel bot = CreateNewBot(strategyName, parametrs, _serverLast, startProgram);
+
                 while (bot.IsConnected == false)
                 {
                     Thread.Sleep(5);
 
-                    if (timeStartWaiting.AddSeconds(20) < DateTime.Now)
+                    if (timeStartWaiting.AddSeconds(50) < DateTime.Now)
                     {
                         _lastTestIsOver = true;
                         return null;
                     }
                 }
 
-                if (bot._chartUi != null)
-                {
-                    bot.StopPaint();
-                }
-
-                //TabsSimple[0].SetNewLogMessage("Bot creation Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
+                TabsSimple[0].SetNewLogMessage("Bot creation Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
 
                 _serverLast.TestingEndEvent += Server_TestingEndEvent;
                 _serverLast.TestingStart();
@@ -442,15 +438,16 @@ namespace OsEngine.Robots.FoundBots
                 while (_lastTestIsOver == false)
                 {
                     Thread.Sleep(5);
-                    if (timeStartWaiting.AddSeconds(20) < DateTime.Now)
+                    if (timeStartWaiting.AddSeconds(50) < DateTime.Now)
                     {
                         _serverLast.TestingEndEvent -= Server_TestingEndEvent;
+                        _lastTestIsOver = true;
                         return null;
                     }
                 }
                 _serverLast.TestingEndEvent -= Server_TestingEndEvent;
 
-                //TabsSimple[0].SetNewLogMessage("Testing Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
+                TabsSimple[0].SetNewLogMessage("Testing Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
                 return bot;
             }
             catch (Exception e)
@@ -540,7 +537,7 @@ namespace OsEngine.Robots.FoundBots
             string folder = GetDataPath();
             SaveCandlesInFolder(tabs, folder);
 
-            OptimizerDataStorage Storage = new OptimizerDataStorage(NameStrategyUniq);
+            OptimizerDataStorage Storage = new OptimizerDataStorage(NameStrategyUniq, false);
             Storage.SourceDataType = TesterSourceDataType.Folder;
             Storage.PathToFolder = folder;
             Storage.TimeEnd = tabs[0].CandlesAll[tabs[0].CandlesAll.Count - 1].TimeStart;
@@ -636,7 +633,7 @@ namespace OsEngine.Robots.FoundBots
 
             if (botToTest == null)
             {
-                botToTest = BotFactory.GetStrategyForName(CurrentStrategy.ValueString, botName + NumberGen.GetNumberDeal(StartProgram), regime, true);
+                botToTest = BotFactory.GetStrategyForName(CurrentStrategy.ValueString, botName + NumberGen.GetNumberDeal(StartProgram.IsTester), regime, true);
 
                 if (regime == StartProgram.IsOsOptimizer)
                 {
@@ -646,14 +643,8 @@ namespace OsEngine.Robots.FoundBots
                 {
                     _botLikeTester = botToTest;
                 }
+            }
 
-            }
-            else
-            {
-                botToTest.TabsSimple[0].Connector.ServerUid = server.NumberServer;
-                botToTest.TabsSimple[0].Connector.ReconnectHard();
-                Thread.Sleep(100);
-            }
 
             for (int i = 0; i < parametrs.Count; i++)
             {
@@ -843,6 +834,7 @@ namespace OsEngine.Robots.FoundBots
             if (_serverLast != null)
             {
                 ServerMaster.RemoveOptimizerServer(_serverLast);
+                _serverLast.TestingEndEvent -= Server_TestingEndEvent;
                 _serverLast = null;
             }
 
