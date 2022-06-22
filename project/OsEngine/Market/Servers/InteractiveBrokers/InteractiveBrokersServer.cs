@@ -898,15 +898,6 @@ namespace OsEngine.Market.Servers.InteractiveBrokers
 
         }
 
-        /// <summary>
-        /// Read available balance from exchange and save it to local storage
-        /// Метод считывает и обновляет размер депозита
-        /// </summary>
-        public void UpdateDepositBalance()
-        {
-
-        }
-
         void _ibClient_NewOrderEvent(Order order)
         {
             if (MyOrderEvent != null)

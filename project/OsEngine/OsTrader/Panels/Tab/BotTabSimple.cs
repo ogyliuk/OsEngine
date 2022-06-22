@@ -2609,19 +2609,6 @@ namespace OsEngine.OsTrader.Panels.Tab
         }
 
         /// <summary>
-        /// read actual balance from exchange and update this value in local storage
-        /// считать текущий баланс с биржи и обновить его значение в локальном хранилище
-        /// </summary>
-        public void UpdateDepositBalance(Position position)
-        {
-            if (StartProgram == StartProgram.IsOsTrader)
-            {
-                OlegUtils.Log("Position {0} {1} has been CLOSED. Going to update deposit balance.", position.NameBot, position.SecurityName);
-                _connector.UpdateDepositBalance();
-            }
-        }
-
-        /// <summary>
         /// withdraw all orders from the system associated with this transaction / 
         /// отозвать все ордера из системы, связанные с этой сделкой
         /// </summary>
@@ -3855,7 +3842,6 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (position.State == PositionStateType.Done)
                 {
                     CloseAllOrderToPosition(position);
-                    UpdateDepositBalance(position);
 
                     if (PositionClosingSuccesEvent != null)
                     {
@@ -3894,10 +3880,6 @@ namespace OsEngine.OsTrader.Panels.Tab
                     if (StartProgram != StartProgram.IsOsOptimizer)
                     {
                         SetNewLogMessage(TabName + OsLocalization.Trader.Label73 + position.Number, LogMessageType.Trade);
-                    }
-                    if (StartProgram == StartProgram.IsOsTrader)
-                    {
-                        OlegUtils.Log("{0} opened new position with VOLUME = {1}", TabName + OsLocalization.Trader.Label73, position.OpenVolume);
                     }
 
                     if (PositionOpeningSuccesEvent != null)

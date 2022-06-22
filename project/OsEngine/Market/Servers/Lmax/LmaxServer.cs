@@ -181,15 +181,6 @@ namespace OsEngine.Market.Servers.Lmax
         }
 
         /// <summary>
-        /// Read available balance from exchange and save it to local storage
-        /// Метод считывает и обновляет размер депозита
-        /// </summary>
-        public void UpdateDepositBalance()
-        {
-
-        }
-
-        /// <summary>
 		/// subscribe to get instrument data
         /// подписаться на получение данных по инструменту
         /// </summary>

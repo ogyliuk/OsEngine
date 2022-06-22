@@ -162,15 +162,6 @@ namespace OsEngine.Market.Servers.BitStamp
         }
 
         /// <summary>
-        /// Read available balance from exchange and save it to local storage
-        /// Метод считывает и обновляет размер депозита
-        /// </summary>
-        public void UpdateDepositBalance()
-        {
-
-        }
-
-        /// <summary>
         /// subscribe
         /// подписаться 
         /// </summary>
