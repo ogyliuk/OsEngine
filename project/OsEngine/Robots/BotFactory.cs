@@ -827,7 +827,6 @@ namespace OsEngine.Robots
 
             try
             {
-                OlegUtils.Log("Setting DEPOSIT BALANCE = {0} USDT to ALL robots", deposit);
                 Type masterBotClassicType = GetBotTypeByName(MASTER_BOT_CLASSIC_CLASS_NAME);
                 if (masterBotClassicType != null)
                 {
@@ -835,32 +834,19 @@ namespace OsEngine.Robots
                     if (staticPortfolioValuePropertyInfo != null)
                     {
                         staticPortfolioValuePropertyInfo.SetValue(null, deposit);
-                        OlegUtils.Log("DEPOSIT BALANCE is set for all robots");
-                    }
-                    else
-                    {
-                        OlegUtils.Log("Can't find {0} PROPERTY info", STATIC_PORTFOLIO_VALUE_PROPERTY_NAME);
                     }
 
                     MethodInfo saveStaticPortfolioMethodInfo = masterBotClassicType.GetMethod(SAVE_STATIC_PORTFOLIO_METHOD_NAME, BindingFlags.Static | BindingFlags.NonPublic);
                     if (saveStaticPortfolioMethodInfo != null)
                     {
                         saveStaticPortfolioMethodInfo.Invoke(null, null);
-                        OlegUtils.Log("DEPOSIT BALANCE is set in GLOBAL settings");
                     }
-                    else
-                    {
-                        OlegUtils.Log("Can't find {0} METHOD info", SAVE_STATIC_PORTFOLIO_METHOD_NAME);
-                    }
-                }
-                else
-                {
-                    OlegUtils.Log("Can't find {0} METHOD info", MASTER_BOT_CLASSIC_CLASS_NAME);
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                OlegUtils.Log("ERROR during update of DEPOSIT BALANCE for ALL robots. Details: {0}", ex.Message);
+                // ignore
+                // TODO : SendLogMessage("ERROR during update of DEPOSIT BALANCE for ALL robots. Details: " + ex.Message, LogMessageType.Error);
             }
         }
 

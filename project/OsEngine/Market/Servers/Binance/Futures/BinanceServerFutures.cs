@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using OsEngine.Entity;
@@ -742,7 +741,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 try
                 {
-                    OlegUtils.Log("Got account info");
                     AssetFutures usdtAssetObject = accountObject.assets.FirstOrDefault(assetObject => assetObject.asset.ToUpper() == "USDT");
                     if (usdtAssetObject != null)
                     {
@@ -754,23 +752,16 @@ namespace OsEngine.Market.Servers.Binance.Futures
                             balanceString = balanceString.Replace(symbolToAvoidParsingErrors, decimalSeparator);
                         }
                         decimal availableBalanceUSDT = Convert.ToDecimal(balanceString);
-
-                        OlegUtils.Log("Current DEPO BALANCE = {0} USDT", availableBalanceUSDT);
                         BotFactory.UpdateDepositBalanceForAllMasterBotRobots(availableBalanceUSDT);
-                    }
-                    else
-                    {
-                        OlegUtils.Log("Can't find USDT DEPOSIT BALANCE in account info");
                     }
                 }
                 catch (Exception ex)
                 {
-                    OlegUtils.Log("ERROR during update of DEPOSIT BALANCE. Details: {0}", ex.Message);
+                    if (LogMessageEvent != null)
+                    {
+                        LogMessageEvent("ERROR during update of DEPOSIT BALANCE. Details: " + ex.Message, LogMessageType.Error);
+                    }
                 }
-            }
-            else
-            {
-                OlegUtils.Log("Can't read DEPOSIT BALANCE...");
             }
         }
 
