@@ -528,7 +528,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     continue;
                 }
 
-                UpdateDepositBalance(_client.GetBalance());
+                UpdateUsdtDepositBalanceForAllMasterBotRobots(_client.GetBalance());
             }
         }
 
@@ -735,7 +735,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
         /// Read available balance from exchange and update it in local storage for all bots
         /// Метод считывает и обновляет размер депозита для всех ботов
         /// </summary>
-        private void UpdateDepositBalance(AccountResponseFutures accountObject)
+        private void UpdateUsdtDepositBalanceForAllMasterBotRobots(AccountResponseFutures accountObject)
         {
             if (accountObject != null && accountObject.assets != null)
             {
@@ -752,7 +752,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                             balanceString = balanceString.Replace(symbolToAvoidParsingErrors, decimalSeparator);
                         }
                         decimal availableBalanceUSDT = Convert.ToDecimal(balanceString);
-                        BotFactory.UpdateDepositBalanceForAllMasterBotRobots(availableBalanceUSDT);
+                        BotFactory.UpdateUsdtDepositBalanceForAllMasterBotRobots(availableBalanceUSDT);
                     }
                 }
                 catch (Exception ex)

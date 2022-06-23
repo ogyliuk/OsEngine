@@ -819,9 +819,10 @@ namespace OsEngine.Robots
             }
         }
 
-        public static void UpdateDepositBalanceForAllMasterBotRobots(decimal deposit)
+        public static void UpdateUsdtDepositBalanceForAllMasterBotRobots(decimal deposit)
         {
             const string MASTER_BOT_CLASSIC_CLASS_NAME = "MasterBotClassic";
+            const string STATIC_AUTO_UPDATE_PORTFOLIO_BALANCE_PROPERTY_NAME = "StaticAutoUpdatePortfolioBalance";
             const string STATIC_PORTFOLIO_VALUE_PROPERTY_NAME = "StaticPortfolioValue";
             const string SAVE_STATIC_PORTFOLIO_METHOD_NAME = "SaveStaticPortfolio";
 
@@ -830,16 +831,21 @@ namespace OsEngine.Robots
                 Type masterBotClassicType = GetBotTypeByName(MASTER_BOT_CLASSIC_CLASS_NAME);
                 if (masterBotClassicType != null)
                 {
-                    PropertyInfo staticPortfolioValuePropertyInfo = masterBotClassicType.GetProperty(STATIC_PORTFOLIO_VALUE_PROPERTY_NAME);
-                    if (staticPortfolioValuePropertyInfo != null)
+                    PropertyInfo staticAutoUpdatePortfolioBalancePropertyInfo = masterBotClassicType.GetProperty(STATIC_AUTO_UPDATE_PORTFOLIO_BALANCE_PROPERTY_NAME);
+                    bool balanceAutoUpdateEnabled = staticAutoUpdatePortfolioBalancePropertyInfo != null && (bool)staticAutoUpdatePortfolioBalancePropertyInfo.GetValue(null);
+                    if (balanceAutoUpdateEnabled)
                     {
-                        staticPortfolioValuePropertyInfo.SetValue(null, deposit);
-                    }
+                        PropertyInfo staticPortfolioValuePropertyInfo = masterBotClassicType.GetProperty(STATIC_PORTFOLIO_VALUE_PROPERTY_NAME);
+                        if (staticPortfolioValuePropertyInfo != null)
+                        {
+                            staticPortfolioValuePropertyInfo.SetValue(null, deposit);
+                        }
 
-                    MethodInfo saveStaticPortfolioMethodInfo = masterBotClassicType.GetMethod(SAVE_STATIC_PORTFOLIO_METHOD_NAME, BindingFlags.Static | BindingFlags.NonPublic);
-                    if (saveStaticPortfolioMethodInfo != null)
-                    {
-                        saveStaticPortfolioMethodInfo.Invoke(null, null);
+                        MethodInfo saveStaticPortfolioMethodInfo = masterBotClassicType.GetMethod(SAVE_STATIC_PORTFOLIO_METHOD_NAME, BindingFlags.Static | BindingFlags.NonPublic);
+                        if (saveStaticPortfolioMethodInfo != null)
+                        {
+                            saveStaticPortfolioMethodInfo.Invoke(null, null);
+                        }
                     }
                 }
             }

@@ -32,9 +32,27 @@ namespace OsEngine.Robots.FoundBots
                 }
             }
         }
+
+        public static bool StaticAutoUpdatePortfolioBalance
+        {
+            get { return _staticAutoUpdatePortfolioBalanceValue; }
+            set
+            {
+                _staticAutoUpdatePortfolioBalanceValue = value;
+                if (StaticAutoUpdatePortfolioBalanceChangedEvent != null)
+                {
+                    StaticAutoUpdatePortfolioBalanceChangedEvent();
+                }
+            }
+        }
+
         private static decimal _staticPortfolioValue;
 
         private static bool _staticPortfolioLoaded;
+
+        private static bool _staticAutoUpdatePortfolioBalanceValue;
+
+        private static bool _staticAutoUpdatePortfolioBalanceLoaded;
 
         private static void LoadStaticPortfolio()
         {
@@ -82,7 +100,51 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
+        private static void LoadStaticAutoUpdatePortfolioBalance()
+        {
+            if (_staticAutoUpdatePortfolioBalanceLoaded)
+            {
+                return;
+            }
+            _staticAutoUpdatePortfolioBalanceLoaded = true;
+
+            if (!File.Exists(@"Engine\StaticAutoUpdatePortfolioBalanceSave.txt"))
+            {
+                return;
+            }
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\StaticAutoUpdatePortfolioBalanceSave.txt"))
+                {
+                    StaticAutoUpdatePortfolioBalance = Convert.ToBoolean(reader.ReadLine());
+                    reader.Close();
+                }
+            }
+            catch (Exception error)
+            {
+                MessageBox.Show(error.ToString());
+            }
+        }
+
+        private static void SaveStaticAutoUpdatePortfolioBalance()
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\StaticAutoUpdatePortfolioBalanceSave.txt", false))
+                {
+                    writer.WriteLine(StaticAutoUpdatePortfolioBalance);
+                    writer.Close();
+                }
+            }
+            catch (Exception error)
+            {
+                MessageBox.Show(error.ToString());
+            }
+        }
+
         public static event Action StaticPortfolioChangedEvent;
+
+        public static event Action StaticAutoUpdatePortfolioBalanceChangedEvent;
 
         #endregion
 
@@ -91,6 +153,7 @@ namespace OsEngine.Robots.FoundBots
         public MasterBotClassic(string name, StartProgram startProgram) : base(name, startProgram)
         {
             LoadStaticPortfolio();
+            LoadStaticAutoUpdatePortfolioBalance();
 
             Regime = CreateParameter("Regime", "Off", new[]
             {
@@ -138,6 +201,26 @@ namespace OsEngine.Robots.FoundBots
                     return;
                 }
                 AllPortfolioValue.ValueDecimal = StaticPortfolioValue;
+            };
+
+            AutoUpdatePortfolioBalance = CreateParameter("Обновлять баланс автоматически", false);
+            AutoUpdatePortfolioBalance.ValueBool = StaticAutoUpdatePortfolioBalance;
+            AutoUpdatePortfolioBalance.ValueChange += () =>
+            {
+                if (StaticAutoUpdatePortfolioBalance == AutoUpdatePortfolioBalance.ValueBool)
+                {
+                    return;
+                }
+                StaticAutoUpdatePortfolioBalance = AutoUpdatePortfolioBalance.ValueBool;
+                SaveStaticAutoUpdatePortfolioBalance();
+            };
+            StaticAutoUpdatePortfolioBalanceChangedEvent += () =>
+            {
+                if (AutoUpdatePortfolioBalance.ValueBool == StaticAutoUpdatePortfolioBalance)
+                {
+                    return;
+                }
+                AutoUpdatePortfolioBalance.ValueBool = StaticAutoUpdatePortfolioBalance;
             };
 
             VolumeDecimals = CreateParameter("Знаков в объёме после запятой", 2, 1, 50, 4);
@@ -235,6 +318,8 @@ namespace OsEngine.Robots.FoundBots
         public StrategyParameterInt OpenOrderLifeTime;
 
         public StrategyParameterDecimal AllPortfolioValue;
+
+        public StrategyParameterBool AutoUpdatePortfolioBalance;
 
         public StrategyParameterDecimal ShiftToStopOpdersValue;
 
