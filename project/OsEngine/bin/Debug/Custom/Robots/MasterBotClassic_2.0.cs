@@ -15,7 +15,6 @@ using OsEngine.Market.Servers.Tester;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Tab;
 using OsEngine.OsTrader.Panels.Attributes;
-using static System.Net.WebRequestMethods;
 
 namespace OsEngine.Robots.FoundBots
 {
@@ -2074,7 +2073,7 @@ namespace OsEngine.Robots.FoundBots
 
             try
             {
-                string accountDetailsString = MakeBinanceRequest(Http.Get, BuildAccountUrl(secretKey), apiKey);
+                string accountDetailsString = MakeBinanceRequest("GET", BuildAccountUrl(secretKey), apiKey);
                 if (!String.IsNullOrWhiteSpace(accountDetailsString))
                 {
                     accountDetailsString = accountDetailsString.Replace(" ", String.Empty).ToLower();
