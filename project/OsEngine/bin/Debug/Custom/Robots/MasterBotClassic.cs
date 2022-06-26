@@ -2338,7 +2338,7 @@ namespace OsEngine.Robots.FoundBots
             HttpStatusCode? statusCode;
             WebHeaderCollection responseHeaders;
             Dictionary<string, string> headers = new Dictionary<string, string>() { { "X-MBX-APIKEY", apiKey } };
-            return MakeRequest(method, fullUrl, headers: headers, content: null, out statusCode, out responseHeaders);
+            return MakeRequest(method, fullUrl, headers, null, out statusCode, out responseHeaders);
         }
 
         private static string MakeRequest(
