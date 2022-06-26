@@ -1,8 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Threading;
+using System.Net;
+using System.Text;
 using System.Windows;
+using System.Threading;
+using System.Globalization;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 using OsEngine.Entity;
 using OsEngine.Logging;
 using OsEngine.Market;
@@ -11,6 +15,7 @@ using OsEngine.Market.Servers.Tester;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Tab;
 using OsEngine.OsTrader.Panels.Attributes;
+using static System.Net.WebRequestMethods;
 
 namespace OsEngine.Robots.FoundBots
 {
@@ -32,27 +37,9 @@ namespace OsEngine.Robots.FoundBots
                 }
             }
         }
-
-        public static bool StaticAutoUpdatePortfolioBalance
-        {
-            get { return _staticAutoUpdatePortfolioBalanceValue; }
-            set
-            {
-                _staticAutoUpdatePortfolioBalanceValue = value;
-                if (StaticAutoUpdatePortfolioBalanceChangedEvent != null)
-                {
-                    StaticAutoUpdatePortfolioBalanceChangedEvent();
-                }
-            }
-        }
-
         private static decimal _staticPortfolioValue;
 
         private static bool _staticPortfolioLoaded;
-
-        private static bool _staticAutoUpdatePortfolioBalanceValue;
-
-        private static bool _staticAutoUpdatePortfolioBalanceLoaded;
 
         private static void LoadStaticPortfolio()
         {
@@ -100,51 +87,7 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
-        private static void LoadStaticAutoUpdatePortfolioBalance()
-        {
-            if (_staticAutoUpdatePortfolioBalanceLoaded)
-            {
-                return;
-            }
-            _staticAutoUpdatePortfolioBalanceLoaded = true;
-
-            if (!File.Exists(@"Engine\StaticAutoUpdatePortfolioBalanceSave.txt"))
-            {
-                return;
-            }
-            try
-            {
-                using (StreamReader reader = new StreamReader(@"Engine\StaticAutoUpdatePortfolioBalanceSave.txt"))
-                {
-                    StaticAutoUpdatePortfolioBalance = Convert.ToBoolean(reader.ReadLine());
-                    reader.Close();
-                }
-            }
-            catch (Exception error)
-            {
-                MessageBox.Show(error.ToString());
-            }
-        }
-
-        private static void SaveStaticAutoUpdatePortfolioBalance()
-        {
-            try
-            {
-                using (StreamWriter writer = new StreamWriter(@"Engine\StaticAutoUpdatePortfolioBalanceSave.txt", false))
-                {
-                    writer.WriteLine(StaticAutoUpdatePortfolioBalance);
-                    writer.Close();
-                }
-            }
-            catch (Exception error)
-            {
-                MessageBox.Show(error.ToString());
-            }
-        }
-
         public static event Action StaticPortfolioChangedEvent;
-
-        public static event Action StaticAutoUpdatePortfolioBalanceChangedEvent;
 
         #endregion
 
@@ -153,7 +96,6 @@ namespace OsEngine.Robots.FoundBots
         public MasterBotClassic(string name, StartProgram startProgram) : base(name, startProgram)
         {
             LoadStaticPortfolio();
-            LoadStaticAutoUpdatePortfolioBalance();
 
             Regime = CreateParameter("Regime", "Off", new[]
             {
@@ -201,26 +143,6 @@ namespace OsEngine.Robots.FoundBots
                     return;
                 }
                 AllPortfolioValue.ValueDecimal = StaticPortfolioValue;
-            };
-
-            AutoUpdatePortfolioBalance = CreateParameter("Обновлять баланс автоматически", false);
-            AutoUpdatePortfolioBalance.ValueBool = StaticAutoUpdatePortfolioBalance;
-            AutoUpdatePortfolioBalance.ValueChange += () =>
-            {
-                if (StaticAutoUpdatePortfolioBalance == AutoUpdatePortfolioBalance.ValueBool)
-                {
-                    return;
-                }
-                StaticAutoUpdatePortfolioBalance = AutoUpdatePortfolioBalance.ValueBool;
-                SaveStaticAutoUpdatePortfolioBalance();
-            };
-            StaticAutoUpdatePortfolioBalanceChangedEvent += () =>
-            {
-                if (AutoUpdatePortfolioBalance.ValueBool == StaticAutoUpdatePortfolioBalance)
-                {
-                    return;
-                }
-                AutoUpdatePortfolioBalance.ValueBool = StaticAutoUpdatePortfolioBalance;
             };
 
             VolumeDecimals = CreateParameter("Знаков в объёме после запятой", 2, 1, 50, 4);
@@ -338,8 +260,6 @@ namespace OsEngine.Robots.FoundBots
         public StrategyParameterInt OpenOrderLifeTime;
 
         public StrategyParameterDecimal AllPortfolioValue;
-
-        public StrategyParameterBool AutoUpdatePortfolioBalance;
 
         public StrategyParameterDecimal ShiftToStopOpdersValue;
 
@@ -990,6 +910,7 @@ namespace OsEngine.Robots.FoundBots
 
             if (slavePosActual.Count != 0 && myPoses.Count == 0)
             {
+                UpdateDepositBalance();
                 for (int i = 0; i < slavePosActual.Count; i++)
                 {
                     OpenPose(slavePosActual[i], tab);
@@ -1394,7 +1315,7 @@ namespace OsEngine.Robots.FoundBots
                     }
 
                     price += (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
-                    Position posMy = tab.BuyAtLimit(GetBuyVolume(), price, pos.TimeOpen.ToString());
+                    Position posMy = tab.BuyAtMarket(GetBuyVolume());
 
                     if (posMy != null)
                     {
@@ -1423,7 +1344,7 @@ namespace OsEngine.Robots.FoundBots
                     }
 
                     price -= (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
-                    Position posMy = tab.SellAtLimit(GetSellVolume(), price, pos.TimeOpen.ToString());
+                    Position posMy = tab.SellAtMarket(GetSellVolume());
                     if (posMy != null)
                     {
                         _positionsToSupportOpenFirstTime.Add(posMy);
@@ -1960,6 +1881,22 @@ namespace OsEngine.Robots.FoundBots
         }
 
         #endregion
+
+        private void UpdateDepositBalance()
+        {
+            try
+            {
+                string apiKey = "IbJgKv0qryySRs8cn8ZVA6nfbKb5qCCMV5vQBvEy8tXgbEa22el3qybQGNoTkCye";
+                string secretKey = "zduDgYTuhY7XNOI3Z88AnrqmveHTAUarVT2wEBbBanrnvAa98GANP9eMaM0bzxjl";
+                decimal balance = DepositBalanceReader.ReadDepositBalance(apiKey, secretKey);
+                if (balance > 0)
+                {
+                    StaticPortfolioValue = balance;
+                    SaveStaticPortfolio();
+                }
+            }
+            catch { }
+        }
     }
 
     public class PositionReport
@@ -2127,5 +2064,158 @@ namespace OsEngine.Robots.FoundBots
         CONTRACTS_NUMBER,
         CONTRACT_CURRENCY,
         PORTFOLIO_PERCENT
+    }
+
+    internal static class DepositBalanceReader
+    {
+        public static decimal ReadDepositBalance(string apiKey, string secretKey)
+        {
+            decimal balanceUSDT = -1m;
+
+            try
+            {
+                string accountDetailsString = MakeBinanceRequest(Http.Get, BuildAccountUrl(secretKey), apiKey);
+                if (!String.IsNullOrWhiteSpace(accountDetailsString))
+                {
+                    accountDetailsString = accountDetailsString.Replace(" ", String.Empty).ToLower();
+                    int usdtBalanceObjectStartIndex = accountDetailsString.IndexOf("\"asset\":\"usdt\"");
+                    string accountDetailsStringStartedFromUsdtObject = accountDetailsString.Substring(usdtBalanceObjectStartIndex);
+                    string usdtBalanceObjectString = accountDetailsStringStartedFromUsdtObject.Substring(0, accountDetailsStringStartedFromUsdtObject.IndexOf("}"));
+                    int balanceKeyStartIndex = usdtBalanceObjectString.IndexOf("crosswalletbalance");
+                    string usdtBalanceObjectStringStartedFromBalanceKey = usdtBalanceObjectString.Substring(balanceKeyStartIndex);
+                    string balanceKeyValuePairString = usdtBalanceObjectStringStartedFromBalanceKey.Substring(0, usdtBalanceObjectStringStartedFromBalanceKey.IndexOf(","));
+                    int semicolonIndex = balanceKeyValuePairString.IndexOf(":");
+                    string balanceValueString = balanceKeyValuePairString.Substring(semicolonIndex).Replace(":", String.Empty).Replace("\"", String.Empty);
+                    if (!String.IsNullOrWhiteSpace(balanceValueString))
+                    {
+                        string decimalSeparator = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+                        string symbolToAvoidParsingErrors = decimalSeparator == "." ? "," : ".";
+                        balanceValueString = balanceValueString.Replace(symbolToAvoidParsingErrors, decimalSeparator);
+                    }
+                    balanceUSDT = Convert.ToDecimal(balanceValueString);
+                }
+            }
+            catch { }
+
+            return balanceUSDT;
+        }
+
+        private static string BuildAccountUrl(string secretKey)
+        {
+            string host = "fapi.binance.com";
+            string operationUrl = "/fapi/v2/account";
+            long timestamp = GetNowUtcTimeAsMillis();
+            string queryString = String.Format("recvWindow=55000&timestamp={0}", timestamp.ToString());
+            string signature = CreateSignatureHMacSha256(queryString, secretKey);
+            return String.Format("https://{0}{1}?{2}&signature={3}", host, operationUrl, queryString, signature);
+        }
+
+        private static long GetNowUtcTimeAsMillis()
+        {
+            DateTime Jan1St1970 = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            DateTime nowUtcDate = TimeZone.CurrentTimeZone.ToUniversalTime(DateTime.Now);
+            return (long)(nowUtcDate - Jan1St1970).TotalMilliseconds;
+        }
+
+        private static string CreateSignatureHMacSha256(string messageToSign, string secretKey)
+        {
+            string signature = String.Empty;
+            try
+            {
+                ASCIIEncoding encoding = new ASCIIEncoding();
+                byte[] keyBytes = encoding.GetBytes(secretKey);
+                byte[] messageBytes = encoding.GetBytes(messageToSign);
+                using (HMACSHA256 cryptographer = new HMACSHA256(keyBytes))
+                {
+                    signature = BitConverter.ToString(cryptographer.ComputeHash(messageBytes)).Replace("-", String.Empty).ToLower();
+                }
+            }
+            catch { }
+            return signature;
+        }
+
+        private static string MakeBinanceRequest(string method, string fullUrl, string apiKey)
+        {
+            HttpStatusCode? statusCode;
+            WebHeaderCollection responseHeaders;
+            Dictionary<string, string> headers = new Dictionary<string, string>() { { "X-MBX-APIKEY", apiKey } };
+            return MakeRequest(method, fullUrl, headers: headers, content: null, out statusCode, out responseHeaders);
+        }
+
+        private static string MakeRequest(
+            string method,
+            string fullUrl,
+            Dictionary<string, string> headers,
+            byte[] content,
+            out HttpStatusCode? statusCode,
+            out WebHeaderCollection responseHeaders
+        )
+        {
+            statusCode = null;
+            responseHeaders = null;
+            string responseBody = null;
+
+            try
+            {
+                HttpWebRequest request = WebRequest.Create(fullUrl) as HttpWebRequest;
+                request.Method = method;
+                request.Proxy = null;
+                if (headers != null && headers.Count > 0)
+                {
+                    foreach (string headerName in headers.Keys)
+                    {
+                        request.Headers[headerName] = headers[headerName];
+                    }
+                }
+                if (content != null)
+                {
+                    using (Stream requestStream = request.GetRequestStream())
+                    {
+                        requestStream.Write(content, 0, content.Length);
+                    }
+                }
+                using (HttpWebResponse response = request.GetResponse() as HttpWebResponse)
+                {
+                    if (response != null)
+                    {
+                        statusCode = response.StatusCode;
+                        responseHeaders = response.Headers;
+                        using (StreamReader responseStreamReader = new StreamReader(response.GetResponseStream()))
+                        {
+                            responseBody = responseStreamReader.ReadToEnd();
+                            responseStreamReader.Close();
+                        }
+                    }
+                    response.Close();
+                }
+            }
+            catch (WebException ex)
+            {
+                using (HttpWebResponse errorResponse = ex.Response as HttpWebResponse)
+                {
+                    if (errorResponse != null)
+                    {
+                        statusCode = errorResponse.StatusCode;
+                        using (StreamReader errorResponseStreamReader = new StreamReader(errorResponse.GetResponseStream()))
+                        {
+                            responseBody = errorResponseStreamReader.ReadToEnd();
+                            errorResponseStreamReader.Close();
+                        }
+                    }
+                    else if (ex.Status == WebExceptionStatus.Timeout)
+                    {
+                        statusCode = HttpStatusCode.RequestTimeout;
+                    }
+
+                    if (errorResponse != null)
+                    {
+                        errorResponse.Close();
+                    }
+                }
+            }
+            catch { }
+
+            return responseBody;
+        }
     }
 }
