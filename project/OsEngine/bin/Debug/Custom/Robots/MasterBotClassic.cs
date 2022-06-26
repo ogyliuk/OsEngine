@@ -2076,25 +2076,14 @@ namespace OsEngine.Robots.FoundBots
             {
                 string apiKey = "IbJgKv0qryySRs8cn8ZVA6nfbKb5qCCMV5vQBvEy8tXgbEa22el3qybQGNoTkCye";
                 string secretKey = "zduDgYTuhY7XNOI3Z88AnrqmveHTAUarVT2wEBbBanrnvAa98GANP9eMaM0bzxjl";
-
-                OlegUtils.Log("Going to UPDATE DEPOSIT BALANCE...");
                 decimal balance = DepositBalanceReader.ReadDepositBalance(apiKey, secretKey);
                 if (balance > 0)
                 {
-                    OlegUtils.Log("ACTUAL DEPOSIT BALANCE = {0} USDT", balance);
                     StaticPortfolioValue = balance;
                     SaveStaticPortfolio();
-                    OlegUtils.Log("DEPOSIT BALANCE has been updated\n");
-                }
-                else
-                {
-                    OlegUtils.Log("DEPOSIT BALANCE is UNKNOWN");
                 }
             }
-            catch (Exception ex)
-            {
-                OlegUtils.Log("ERROR of DEPOSIT BALANCE updation. Details: {0}", ex.Message);
-            }
+            catch { }
         }
     }
 
