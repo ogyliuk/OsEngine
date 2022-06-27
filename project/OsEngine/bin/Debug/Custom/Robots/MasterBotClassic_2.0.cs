@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Linq;
 using System.Windows;
 using System.Threading;
 using System.Globalization;
@@ -1886,13 +1887,62 @@ namespace OsEngine.Robots.FoundBots
         {
             try
             {
-                string apiKey = "IbJgKv0qryySRs8cn8ZVA6nfbKb5qCCMV5vQBvEy8tXgbEa22el3qybQGNoTkCye";
-                string secretKey = "zduDgYTuhY7XNOI3Z88AnrqmveHTAUarVT2wEBbBanrnvAa98GANP9eMaM0bzxjl";
+                string apiKey;
+                string secretKey;
+                ReadAccountCredentials(out apiKey, out secretKey);
                 decimal balance = DepositBalanceReader.ReadDepositBalance(apiKey, secretKey);
                 if (balance > 0)
                 {
                     StaticPortfolioValue = balance;
                     SaveStaticPortfolio();
+                }
+            }
+            catch { }
+        }
+
+        private static void ReadAccountCredentials(out string apiKey, out string secretKey)
+        {
+            const string FILEPATH = "Engine\\BinanceFuturesParams.txt";
+            const string API_KEY_TOKEN = "Публичный ключ";
+            const string SECRET_KEY_TOKEN = "Секретный ключ";
+
+            apiKey = null;
+            secretKey = null;
+
+            try
+            {
+                if (File.Exists(FILEPATH))
+                {
+                    using (StreamReader reader = new StreamReader(FILEPATH))
+                    {
+                        while (!reader.EndOfStream)
+                        {
+                            string line = reader.ReadLine();
+                            if (!string.IsNullOrWhiteSpace(line))
+                            {
+                                if (line.Contains(API_KEY_TOKEN))
+                                {
+                                    List<string> apiKeyItems = new List<string>(line.Split('^'));
+                                    if (apiKeyItems.Any())
+                                    {
+                                        apiKey = apiKeyItems.Last();
+                                    }
+                                }
+                                if (line.Contains(SECRET_KEY_TOKEN))
+                                {
+                                    List<string> secretKeyItems = new List<string>(line.Split('^'));
+                                    if (secretKeyItems.Any())
+                                    {
+                                        secretKey = secretKeyItems.Last();
+                                    }
+                                }
+                            }
+                            if (apiKey != null && secretKey != null)
+                            {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             catch { }
