@@ -2079,6 +2079,7 @@ namespace OsEngine.Robots.FoundBots
                 string apiKey;
                 string secretKey;
                 ReadAccountCredentials(out apiKey, out secretKey);
+                Thread.Sleep(1000);
                 decimal balance = DepositBalanceReader.ReadDepositBalance(apiKey, secretKey);
                 if (balance > 0)
                 {
