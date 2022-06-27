@@ -1241,6 +1241,7 @@ namespace OsEngine.Robots.FoundBots
                 return;
             }
 
+            UpdateDepositBalance();
             for (int i = 0; i < slavePoses.Count; i++)
             {
                 if (tab.PositionsOpenAll.Count >= MaxPositionDuplicateCount.ValueInt)
