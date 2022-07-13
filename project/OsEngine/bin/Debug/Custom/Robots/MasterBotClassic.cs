@@ -37,7 +37,6 @@ namespace OsEngine.Robots.FoundBots
                 }
             }
         }
-
         private static decimal _staticPortfolioValue;
 
         private static bool _staticPortfolioLoaded;
@@ -64,9 +63,9 @@ namespace OsEngine.Robots.FoundBots
                     reader.Close();
                 }
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // ignore
+                MessageBox.Show(error.ToString());
             }
 
         }
@@ -82,9 +81,9 @@ namespace OsEngine.Robots.FoundBots
                     writer.Close();
                 }
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // ignore
+                MessageBox.Show(error.ToString());
             }
         }
 
@@ -109,14 +108,16 @@ namespace OsEngine.Robots.FoundBots
             List<string> strategies = BotFactory.GetScriptsNamesStrategy();
             CurrentStrategy = CreateParameter("Встроенная стратегия", "None", strategies.ToArray());
 
-            VolumeOnPosition = CreateParameter("Объём входа", 10, 1.0m, 50, 4);
+            VolumeOnPosition = CreateParameter("Объём входа", 10, 1.0m, 50, 4, "Настройки объёма");
 
             VolumeRegime = CreateParameter("Тип объёма", "Валюта контракта", new[]
 {
                 "Кол-во контрактов", "Валюта контракта", "% от Общего объёма портфеля"
-            });
+            }, "Настройки объёма");
 
-            AllPortfolioValue = CreateParameter("Общий объём портфеля", 5000m, 1, 50000, 100);
+            AllPortfolioValue = CreateParameter("Общий объём портфеля", 5000m, 1, 50000, 100, "Настройки объёма");
+
+
 
             if (StaticPortfolioValue != 0)
             {
@@ -127,8 +128,18 @@ namespace OsEngine.Robots.FoundBots
                 StaticPortfolioValue = AllPortfolioValue.ValueDecimal;
             }
 
+            VolumeDecimals = CreateParameter("Знаков в объёме после запятой", 2, 1, 50, 4, "Настройки объёма");
+
+            AutoPortfolioValueUpDate = CreateParameter("Авто обновление объёма", false, "Настройки объёма");
+            AutoPortfolioMultValue = CreateParameter("Мультипликатор для авто-обновелния портфеля", 1m, 1, 15, 1, "Настройки объёма");
+            AutoPortfolioNameValue = CreateParameter("Имя портфеля для авто-обновления", "USDT", "Настройки объёма");
+
             AllPortfolioValue.ValueChange += () =>
             {
+                if (AutoPortfolioValueUpDate.ValueBool == true)
+                {
+                    return;
+                }
                 if (StaticPortfolioValue == AllPortfolioValue.ValueDecimal)
                 {
                     return;
@@ -139,14 +150,16 @@ namespace OsEngine.Robots.FoundBots
 
             StaticPortfolioChangedEvent += () =>
             {
+                if (AutoPortfolioValueUpDate.ValueBool == true)
+                {
+                    return;
+                }
                 if (AllPortfolioValue.ValueDecimal == StaticPortfolioValue)
                 {
                     return;
                 }
                 AllPortfolioValue.ValueDecimal = StaticPortfolioValue;
             };
-
-            VolumeDecimals = CreateParameter("Знаков в объёме после запятой", 2, 1, 50, 4);
 
             MaxPositionDuplicateCount = CreateParameter("Макс. кол-во позиций для дублирования", 1, 1, 15, 1);
 
@@ -156,27 +169,91 @@ namespace OsEngine.Robots.FoundBots
             ShowSlaveParameters = CreateParameterButton("Параметры встроенной стратегии");
             ShowSlaveParameters.UserClickOnButtonEvent += ShowSlaveParameters_UserClickOnButtonEvent;
 
-            SlippageInter = CreateParameter("Проскальзывание вход %", 0.05m, 1, 50, 4);
-            SlippageExit = CreateParameter("Проскальзывание выход %", 0.15m, 1, 50, 4);
-            SlippageSecondInter = CreateParameter("Проскальзывание вход 2 %", 0.15m, 1, 50, 4);
-            SlippageSecondExit = CreateParameter("Проскальзывание выход 2 %", 0.25m, 1, 50, 4);
-            OpenOrderLifeTime = CreateParameter("Время жизни ордера", 60, 1, 50, 4);
-            MaxOrderExecutionDeviation = CreateParameter("Макс отклонение для повторного исполнения %", 0.05m, 1m, 50, 4);
-            InterTime = CreateParameter("Время на попытки повторного входа сек", 600, 1, 5000, 4);
-            ShiftToStopOpdersValue = CreateParameter("Отступ для входов и стопов %", 0.01m, 1, 50, 4);
+            SlippageInter = CreateParameter("Проскальзывание вход %", 0.05m, 1, 50, 4, "Проскальзывания и отступы");
+            SlippageExit = CreateParameter("Проскальзывание выход %", 0.15m, 1, 50, 4, "Проскальзывания и отступы");
+            SlippageSecondInter = CreateParameter("Проскальзывание вход 2 %", 0.15m, 1, 50, 4, "Проскальзывания и отступы");
+            SlippageSecondExit = CreateParameter("Проскальзывание выход 2 %", 0.25m, 1, 50, 4, "Проскальзывания и отступы");
+            OpenOrderLifeTime = CreateParameter("Время жизни ордера", 60, 1, 50, 4, "Проскальзывания и отступы");
+            MaxOrderExecutionDeviation = CreateParameter("Макс отклонение для повторного исполнения %", 0.05m, 1m, 50, 4, "Проскальзывания и отступы");
+            InterTime = CreateParameter("Время на попытки повторного входа сек", 600, 1, 5000, 4, "Проскальзывания и отступы");
+            ShiftToStopOpdersValue = CreateParameter("Отступ для входов и стопов %", 0.01m, 1, 50, 4, "Проскальзывания и отступы");
 
             CreateSlave();
 
             ParametrsChangeByUser += ParametrsChange;
 
-            Thread worker = new Thread(Worker);
-            worker.Start();
+            Task.Run(new Action(Worker));
 
-            Thread support = new Thread(PositionSupportThread);
-            support.IsBackground = true;
-            support.Start();
+            Task.Run(new Action(PositionSupportThread));
 
-            LoadPositionReports();
+            ClearDataDirectory();
+
+            DeleteEvent += MasterBotClassic_DeleteEvent;
+
+            ClearTempOptiFiles();
+        }
+
+        private void ClearTempOptiFiles()
+        {
+            if (Directory.Exists(@"Engine\") == false)
+            {
+                return;
+            }
+
+            string[] files = Directory.GetFiles(@"Engine\");
+
+            if (_slave == null)
+            {
+                return;
+            }
+
+            string strategyType = _slave.GetType().Name;
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                if (files[i].StartsWith(@"Engine\" + strategyType + 0)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 0)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 1)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 2)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 3)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 4)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 5)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 6)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 7)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 8)
+                    || files[i].StartsWith(@"Engine\" + strategyType + 9))
+                {
+                    try
+                    {
+                        File.Delete(files[i]);
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+
+
+            }
+
+        }
+
+        private void MasterBotClassic_DeleteEvent()
+        {
+            ClearSavePoses("firstOpen");
+            ClearSavePoses("secondOpen");
+            ClearSavePoses("firstClose");
+            ClearSavePoses("secondClose");
+
+            if (_slave != null)
+            {
+                _slave.Delete();
+            }
+            if (_botLikeTester != null)
+            {
+                _botLikeTester.Delete();
+            }
+            _isDeteted = true;
         }
 
         private void ShowSlaveParameters_UserClickOnButtonEvent()
@@ -241,6 +318,12 @@ namespace OsEngine.Robots.FoundBots
         public StrategyParameterInt OpenOrderLifeTime;
 
         public StrategyParameterDecimal AllPortfolioValue;
+
+        public StrategyParameterBool AutoPortfolioValueUpDate;
+
+        public StrategyParameterString AutoPortfolioNameValue;
+
+        public StrategyParameterDecimal AutoPortfolioMultValue;
 
         public StrategyParameterDecimal ShiftToStopOpdersValue;
 
@@ -321,31 +404,45 @@ namespace OsEngine.Robots.FoundBots
 
             DateTime timeStartWaiting = DateTime.Now;
 
-            BotPanel bot = TestRobot(CurrentStrategy.ValueString, TabsSimple, _slave.Parameters);
+            _botLikeTester = TestRobot(CurrentStrategy.ValueString, TabsSimple, _slave.Parameters, StartProgram.IsTester);
 
             TabsSimple[0].SetNewLogMessage("Test bot Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
 
-            if (bot != null)
+            if (_botLikeTester != null)
             {
                 CloseParameterDialog();
                 _slave.CloseParameterDialog();
-                bot.ShowChartDialog();
+                _botLikeTester.ShowChartDialog();
+                _botLikeTester.ChartClosedEvent += Bot_ChartClosedEvent;
             }
+        }
+
+        private void Bot_ChartClosedEvent(string obj)
+        {
+            if (_botLikeTester != null)
+            {
+                _botLikeTester.ChartClosedEvent -= Bot_ChartClosedEvent;
+                _botLikeTester.Clear();
+                _botLikeTester.Delete();
+                _botLikeTester = null;
+            }
+
+            ClearLastSession();
         }
 
         #endregion
 
         #region работа встроенного оптимизатора
 
-        private OptimizerDataStorage _storage;
+        private OptimizerDataStorage _storageLast;
 
-        private BotPanel _bot;
+        private OptimizerServer _serverLast;
 
         private bool _lastTestIsOver = true;
 
         private string _botStarterLocker = "botsLocker";
 
-        private BotPanel TestRobot(string strategyName, List<BotTabSimple> tabs, List<IIStrategyParameter> parametrs)
+        private BotPanel TestRobot(string strategyName, List<BotTabSimple> tabs, List<IIStrategyParameter> parametrs, StartProgram startProgram)
         {
             try
             {
@@ -360,13 +457,13 @@ namespace OsEngine.Robots.FoundBots
 
                 DateTime timeStartStorageCreate = DateTime.Now;
 
-                _storage = CreateNewStorage(tabs);
+                _storageLast = CreateNewStorage(tabs);
 
                 //TabsSimple[0].SetNewLogMessage("StorageCreate " + (DateTime.Now - timeStartStorageCreate).ToString(), LogMessageType.System);
 
                 DateTime timeStartWaiting = DateTime.Now;
 
-                while (_storage.Securities == null)
+                while (_storageLast.Securities == null)
                 {
                     Thread.Sleep(10);
 
@@ -381,51 +478,46 @@ namespace OsEngine.Robots.FoundBots
 
                 timeStartWaiting = DateTime.Now;
 
-                OptimizerServer server = CreateNewServer(_storage, _storage.TimeStart, _storage.TimeEnd.AddHours(2));
+                _serverLast = CreateNewServer(_storageLast, _storageLast.TimeStart, _storageLast.TimeEnd.AddHours(2));
 
 
                 //TabsSimple[0].SetNewLogMessage("Server creation Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
 
                 timeStartWaiting = DateTime.Now;
 
-                _bot = CreateNewBot(strategyName, parametrs, server, StartProgram.IsTester);
-                while (_bot.IsConnected == false)
+                BotPanel bot = CreateNewBot(strategyName, parametrs, _serverLast, startProgram);
+
+                while (bot.IsConnected == false)
                 {
                     Thread.Sleep(5);
 
-                    if (timeStartWaiting.AddSeconds(20) < DateTime.Now)
+                    if (timeStartWaiting.AddSeconds(50) < DateTime.Now)
                     {
                         _lastTestIsOver = true;
                         return null;
                     }
-                }
-
-                if (_bot._chartUi != null)
-                {
-                    _bot.StopPaint();
                 }
 
                 //TabsSimple[0].SetNewLogMessage("Bot creation Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
 
-                bool testIsOver = false;
-                server.TestingEndEvent += delegate (int i) { testIsOver = true; };
-                server.TestingStart();
-
+                _serverLast.TestingEndEvent += Server_TestingEndEvent;
+                _serverLast.TestingStart();
 
                 timeStartWaiting = DateTime.Now;
-                while (testIsOver == false)
+                while (_lastTestIsOver == false)
                 {
                     Thread.Sleep(5);
-                    if (timeStartWaiting.AddSeconds(20) < DateTime.Now)
+                    if (timeStartWaiting.AddSeconds(50) < DateTime.Now)
                     {
+                        _serverLast.TestingEndEvent -= Server_TestingEndEvent;
                         _lastTestIsOver = true;
                         return null;
                     }
                 }
-                Thread.Sleep(500);
+                _serverLast.TestingEndEvent -= Server_TestingEndEvent;
+
                 //TabsSimple[0].SetNewLogMessage("Testing Time " + (DateTime.Now - timeStartWaiting).ToString(), LogMessageType.System);
-                _lastTestIsOver = true;
-                return _bot;
+                return bot;
             }
             catch (Exception e)
             {
@@ -435,17 +527,17 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
+        private void Server_TestingEndEvent(int obj)
+        {
+            _lastTestIsOver = true;
+        }
+
         private string _pathToBotData;
 
         private static bool _tempDirAlreadyClear = false;
 
-        private string GetDataPath()
+        private static void ClearDataDirectory()
         {
-            if (_pathToBotData != null)
-            {
-                return _pathToBotData;
-            }
-
             string folder = "Data\\";
 
             if (Directory.Exists(folder) == false)
@@ -468,7 +560,7 @@ namespace OsEngine.Robots.FoundBots
                 }
                 catch
                 {
-                    // ignore
+
                 }
 
                 try
@@ -477,10 +569,21 @@ namespace OsEngine.Robots.FoundBots
                 }
                 catch
                 {
-                    // ignore
+
                 }
             }
 
+        }
+
+        private string GetDataPath()
+        {
+            if (_pathToBotData != null)
+            {
+                return _pathToBotData;
+            }
+
+            string folder = "Data\\";
+            folder += "AdminCapacityTemp\\";
             folder += NumberGen.GetNumberDeal(TabsSimple[0].StartProgram) + "\\";
 
             if (Directory.Exists(folder) == false)
@@ -500,42 +603,10 @@ namespace OsEngine.Robots.FoundBots
 
         private OptimizerDataStorage CreateNewStorage(List<BotTabSimple> tabs)
         {
-            //_sourceDataType == TesterSourceDataType.Folder && !string.IsNullOrWhiteSpace(_pathToFolder)
-
             string folder = GetDataPath();
-
             SaveCandlesInFolder(tabs, folder);
 
-            //tabs[0].SetNewLogMessage("Bot save folder. Bot: " + NameStrategyUniq + "Folder: " + folder, LogMessageType.Error);
-
-            /* if (_storage != null &&
-                 _storage.PathToFolder == folder &&
-                 _storage.TimeEnd == tabs[0].CandlesFinishedOnly[tabs[0].CandlesFinishedOnly.Count - 1].TimeStart)
-             {
-                 return _storage;
-             }*/
-
-
-
-            if (_storage != null)
-            {
-                _storage.TimeEnd = tabs[0].CandlesAll[tabs[0].CandlesAll.Count - 1].TimeStart;
-                _storage.TimeStart = tabs[0].CandlesFinishedOnly[0].TimeStart;
-                _storage.TimeNow = tabs[0].CandlesFinishedOnly[0].TimeStart;
-
-                if (_storage.Securities == null)
-                {
-                    _storage.ReloadSecurities(true);
-                }
-                else
-                {
-                    _storage.ClearStorages();
-                }
-
-                return _storage;
-            }
-
-            OptimizerDataStorage Storage = new OptimizerDataStorage(NameStrategyUniq);
+            OptimizerDataStorage Storage = new OptimizerDataStorage(NameStrategyUniq, false);
             Storage.SourceDataType = TesterSourceDataType.Folder;
             Storage.PathToFolder = folder;
             Storage.TimeEnd = tabs[0].CandlesAll[tabs[0].CandlesAll.Count - 1].TimeStart;
@@ -543,6 +614,8 @@ namespace OsEngine.Robots.FoundBots
             Storage.TimeNow = tabs[0].CandlesFinishedOnly[0].TimeStart;
 
             Storage.ReloadSecurities(true);
+
+            _storageLast = Storage;
 
             return Storage;
         }
@@ -578,8 +651,6 @@ namespace OsEngine.Robots.FoundBots
 
         }
 
-        List<OptimizerServer> _servers = new List<OptimizerServer>();
-
         private OptimizerServer CreateNewServer(OptimizerDataStorage storage, DateTime timeCandleStart,
             DateTime timeCandleEnd)
         {
@@ -588,11 +659,7 @@ namespace OsEngine.Robots.FoundBots
             OptimizerServer server = ServerMaster.CreateNextOptimizerServer(storage,
                 NumberGen.GetNumberDeal(StartProgram), 100000);
 
-            _servers.Add(server);
-
-            server.TestingEndEvent += server_TestingEndEvent;
             server.TypeTesterData = storage.TypeTesterData;
-
 
             Security secToStart = storage.Securities[0];
 
@@ -613,48 +680,49 @@ namespace OsEngine.Robots.FoundBots
             return server;
         }
 
-        private object _serverRemoveLocker = new object();
+        private BotPanel _botLikeTester;
 
-        private void server_TestingEndEvent(int serverNum)
-        {
-            lock (_serverRemoveLocker)
-            {
-                for (int i = 0; i < _servers.Count; i++)
-                {
-                    if (_servers[i].NumberServer == serverNum)
-                    {
-                        _servers[i].TestingEndEvent -= server_TestingEndEvent;
-                        _servers[i].Clear();
-                        ServerMaster.RemoveOptimizerServer(_servers[i]);
-                        _servers.RemoveAt(i);
-                        break;
-                    }
-                }
-            }
-
-            if (_bot._chartUi != null)
-            {
-                _bot._chartUi.StartPaint();
-            }
-        }
-
-        private BotPanel _slaveBot;
+        private BotPanel _botLikeOptimizer;
 
         private BotPanel CreateNewBot(string botName,
         List<IIStrategyParameter> parametrs,
         OptimizerServer server, StartProgram regime)
         {
-            if (_slaveBot == null)
+            BotPanel botToTest = null;
+
+            if (regime == StartProgram.IsOsOptimizer)
             {
-                _slaveBot = BotFactory.GetStrategyForName(CurrentStrategy.ValueString, botName + NumberGen.GetNumberDeal(StartProgram), regime, true);
+                botToTest = _botLikeOptimizer;
+            }
+            else if (regime == StartProgram.IsTester)
+            {
+                botToTest = _botLikeTester;
+            }
+
+            if (botToTest == null)
+            {
+                botToTest = BotFactory.GetStrategyForName(CurrentStrategy.ValueString, botName + NumberGen.GetNumberDeal(StartProgram.IsTester), regime, true);
+
+                if (regime == StartProgram.IsOsOptimizer)
+                {
+                    _botLikeOptimizer = botToTest;
+                }
+                else if (regime == StartProgram.IsTester)
+                {
+                    _botLikeTester = botToTest;
+                }
+
+                if (botToTest != null)
+                {
+                    botToTest.TabsSimple[0].Connector.ServerUid = server.NumberServer;
+                }
             }
             else
             {
-                _slaveBot.Clear();
-                _slaveBot.TabsSimple[0].Connector.ServerUid = server.NumberServer;
-                _slaveBot.TabsSimple[0].Connector.ReconnectHard();
-                Thread.Sleep(100);
+                botToTest.TabsSimple[0].Connector.ServerUid = server.NumberServer;
+                botToTest.TabsSimple[0].Connector.ReconnectHard();
             }
+
 
             for (int i = 0; i < parametrs.Count; i++)
             {
@@ -665,21 +733,21 @@ namespace OsEngine.Robots.FoundBots
                     par = parametrs[i];
                 }
 
-                if (_slaveBot.Parameters[i].Type == StrategyParameterType.Bool)
+                if (botToTest.Parameters[i].Type == StrategyParameterType.Bool)
                 {
-                    ((StrategyParameterBool)_slaveBot.Parameters[i]).ValueBool = ((StrategyParameterBool)par).ValueBool;
+                    ((StrategyParameterBool)botToTest.Parameters[i]).ValueBool = ((StrategyParameterBool)par).ValueBool;
                 }
-                else if (_slaveBot.Parameters[i].Type == StrategyParameterType.String)
+                else if (botToTest.Parameters[i].Type == StrategyParameterType.String)
                 {
-                    ((StrategyParameterString)_slaveBot.Parameters[i]).ValueString = ((StrategyParameterString)par).ValueString;
+                    ((StrategyParameterString)botToTest.Parameters[i]).ValueString = ((StrategyParameterString)par).ValueString;
                 }
-                else if (_slaveBot.Parameters[i].Type == StrategyParameterType.Int)
+                else if (botToTest.Parameters[i].Type == StrategyParameterType.Int)
                 {
-                    ((StrategyParameterInt)_slaveBot.Parameters[i]).ValueInt = ((StrategyParameterInt)par).ValueInt;
+                    ((StrategyParameterInt)botToTest.Parameters[i]).ValueInt = ((StrategyParameterInt)par).ValueInt;
                 }
-                else if (_slaveBot.Parameters[i].Type == StrategyParameterType.Decimal)
+                else if (botToTest.Parameters[i].Type == StrategyParameterType.Decimal)
                 {
-                    ((StrategyParameterDecimal)_slaveBot.Parameters[i]).ValueDecimal = ((StrategyParameterDecimal)par).ValueDecimal;
+                    ((StrategyParameterDecimal)botToTest.Parameters[i]).ValueDecimal = ((StrategyParameterDecimal)par).ValueDecimal;
                 }
             }
 
@@ -687,26 +755,26 @@ namespace OsEngine.Robots.FoundBots
             // настраиваем вкладки
             for (int i = 0; i < TabsSimple.Count; i++)
             {
-                _slaveBot.TabsSimple[i].Connector.ServerType = ServerType.Optimizer;
-                _slaveBot.TabsSimple[i].Connector.PortfolioName = server.Portfolios[0].Number;
-                _slaveBot.TabsSimple[i].Connector.SecurityName = TabsSimple[i].Connector.SecurityName;
-                _slaveBot.TabsSimple[i].Connector.SecurityClass = TabsSimple[i].Connector.SecurityClass;
-                _slaveBot.TabsSimple[i].Connector.TimeFrame = TabsSimple[i].Connector.TimeFrame;
-                _slaveBot.TabsSimple[i].Connector.ServerUid = server.NumberServer;
+                botToTest.TabsSimple[i].Connector.ServerType = ServerType.Optimizer;
+                botToTest.TabsSimple[i].Connector.PortfolioName = server.Portfolios[0].Number;
+                botToTest.TabsSimple[i].Connector.SecurityName = TabsSimple[i].Connector.SecurityName;
+                botToTest.TabsSimple[i].Connector.SecurityClass = TabsSimple[i].Connector.SecurityClass;
+                botToTest.TabsSimple[i].Connector.TimeFrame = TabsSimple[i].Connector.TimeFrame;
+                botToTest.TabsSimple[i].Connector.ServerUid = server.NumberServer;
 
                 if (server.TypeTesterData == TesterDataType.Candle)
                 {
-                    _slaveBot.TabsSimple[i].Connector.CandleMarketDataType = CandleMarketDataType.Tick;
+                    botToTest.TabsSimple[i].Connector.CandleMarketDataType = CandleMarketDataType.Tick;
                 }
                 else if (server.TypeTesterData == TesterDataType.MarketDepthAllCandleState ||
                          server.TypeTesterData == TesterDataType.MarketDepthOnlyReadyCandle)
                 {
-                    _slaveBot.TabsSimple[i].Connector.CandleMarketDataType =
+                    botToTest.TabsSimple[i].Connector.CandleMarketDataType =
                         CandleMarketDataType.MarketDepth;
                 }
             }
 
-            return _slaveBot;
+            return botToTest;
         }
 
         #endregion
@@ -715,6 +783,9 @@ namespace OsEngine.Robots.FoundBots
 
         private void AdminCapacityCreator_CandleFinishedEvent(List<Candle> candles)
         {
+            //
+
+
             if (StartProgram == StartProgram.IsOsTrader)
             {
                 return;
@@ -731,21 +802,25 @@ namespace OsEngine.Robots.FoundBots
                 return;
             }
 
-            if (TimeStart.Value > candles[candles.Count - 1].TimeStart ||
-                TimeEnd.Value < candles[candles.Count - 1].TimeStart)
-            {
-                return;
-            }
-
             if (candles.Count < 20)
             {
                 return;
             }
 
-            _neadToTestBot = true;
+            DateTime time = DateTime.Now;
+            Logic();
+            TimeSpan timeTest = DateTime.Now - time;
+            TabsSimple[0].SetNewLogMessage("Logic time: " + timeTest.TotalSeconds.ToString(), LogMessageType.System);
+
+            TimeSpan timeClearing = DateTime.Now - time;
+            TabsSimple[0].SetNewLogMessage("Clearing time: " + timeClearing.TotalSeconds.ToString(), LogMessageType.System);
+            ClearLastSession();
+
         }
 
         private bool _neadToTestBot;
+
+        private bool _isDeteted;
 
         private void Worker()
         {
@@ -757,6 +832,11 @@ namespace OsEngine.Robots.FoundBots
             {
                 Thread.Sleep(50);
 
+                if (_isDeteted == true)
+                {
+                    return;
+                }
+
                 if (_neadToTestBot == false)
                 {
                     CheckCandlesCount();
@@ -764,8 +844,75 @@ namespace OsEngine.Robots.FoundBots
                 }
 
                 _neadToTestBot = false;
-                Thread.Sleep(100);
+                DateTime time = DateTime.Now;
                 Logic();
+                TimeSpan timeTest = DateTime.Now - time;
+                TabsSimple[0].SetNewLogMessage("Logic time: " + timeTest.TotalSeconds.ToString(), LogMessageType.System);
+                ClearLastSession();
+                UpdateDepositBalance();
+            }
+        }
+
+        private void CheckPortfolioAutoDate()
+        {
+            if (AutoPortfolioValueUpDate.ValueBool == false)
+            {
+                return;
+            }
+
+            //AutoPortfolioNameValue;
+            //AutoPortfolioMultValue;
+
+            decimal curValue = AllPortfolioValue.ValueDecimal;
+
+            if (TabsSimple == null
+                || TabsSimple.Count == 0)
+            {
+                return;
+            }
+
+            Portfolio portfolio = TabsSimple[0].Portfolio;
+
+            if (portfolio == null)
+            {
+                return;
+            }
+
+            List<PositionOnBoard> poses = portfolio.GetPositionOnBoard();
+
+            if (poses == null)
+            {
+                return;
+            }
+
+            if (AutoPortfolioNameValue.ValuesString == null
+                || AutoPortfolioNameValue.ValuesString.Count == 0)
+            {
+                return;
+            }
+
+            string secName = AutoPortfolioNameValue.ValuesString[0];
+
+            for (int i = 0; i < poses.Count; i++)
+            {
+                if (poses[i].SecurityNameCode == secName)
+                {
+                    decimal value = poses[i].ValueCurrent;
+
+                    if (value == 0)
+                    {
+                        return;
+                    }
+
+                    decimal mult = AutoPortfolioMultValue.ValueDecimal;
+
+                    if (mult <= 0)
+                    {
+                        mult = 1;
+                    }
+
+                    AllPortfolioValue.ValueDecimal = value * mult;
+                }
             }
         }
 
@@ -814,16 +961,8 @@ namespace OsEngine.Robots.FoundBots
                 return;
             }
 
-            if (_neadToTestBot == false)
-            {
-                return;
-            }
-
-            _neadToTestBot = false;
-
             try
             {
-                Logic();
                 SupportLogic(trade.Time);
             }
             catch (Exception error)
@@ -832,55 +971,64 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
+        private void ClearLastSession()
+        {
+            if (_serverLast != null)
+            {
+                ServerMaster.RemoveOptimizerServer(_serverLast);
+                _serverLast.TestingEndEvent -= Server_TestingEndEvent;
+                _serverLast = null;
+            }
+
+            if (_storageLast != null)
+            {
+                _storageLast.ClearDelete();
+                _storageLast = null;
+            }
+
+            if (_botLikeOptimizer != null)
+            {
+                _botLikeOptimizer.Delete();
+                _botLikeOptimizer = null;
+            }
+        }
+
         private void Logic()
         {
+
             if (Regime.ValueString == "Off")
             {
                 return;
             }
-
-            DateTime time = DateTime.Now;
 
             if (TabsSimple[0].CandlesAll.Count < 50)
             {
                 return;
             }
 
-            try
+            BotPanel bot = TestRobot(CurrentStrategy.ValueString, TabsSimple, _slave.Parameters, StartProgram.IsOsOptimizer);
+
+            if (bot == null)
             {
-                BotPanel bot = TestRobot(CurrentStrategy.ValueString, TabsSimple, _slave.Parameters);
-
-                if (bot == null)
-                {
-                    return;
-                }
-
-                List<Position> slavePoses = null;
-
-                for (int i = 0; i < bot.TabsSimple.Count; i++)
-                {
-                    slavePoses = bot.TabsSimple[i].PositionsOpenAll;
-                    List<PositionOpenerToStop> slaveStops = bot.TabsSimple[i].PositionOpenerToStopsAll;
-
-                    CopyPositions(slavePoses, TabsSimple[i], bot.TabsSimple[i].PositionsAll);
-                    CopyStopOpenier(slaveStops, TabsSimple[i]);
-                }
-
-                TimeSpan timeTest = DateTime.Now - time;
-
-                TabsSimple[0].SetNewLogMessage(timeTest.ToString(), LogMessageType.System);
-
-                if (slavePoses.Count != 0)
-                {
-                    TabsSimple[0].SetNewLogMessage("Slave Pos" + slavePoses[0].TimeOpen + " stop : "
-                        + slavePoses[0].StopOrderIsActiv.ToString() + " Price : "
-                        + slavePoses[0].StopOrderRedLine, LogMessageType.System);
-                }
-
+                return;
             }
-            catch (Exception error)
+
+            List<Position> slavePoses = null;
+
+            for (int i = 0; i < bot.TabsSimple.Count; i++)
             {
-                TabsSimple[0].SetNewLogMessage(error.ToString(), LogMessageType.System);
+                slavePoses = bot.TabsSimple[i].PositionsOpenAll;
+                List<PositionOpenerToStop> slaveStops = bot.TabsSimple[i].PositionOpenerToStopsAll;
+
+                CopyPositions(slavePoses, TabsSimple[i], bot.TabsSimple[i].PositionsAll);
+                CopyStopOpenier(slaveStops, TabsSimple[i]);
+            }
+
+            if (slavePoses.Count != 0)
+            {
+                TabsSimple[0].SetNewLogMessage("Slave Pos" + slavePoses[0].TimeOpen + " stop : "
+                    + slavePoses[0].StopOrderIsActiv.ToString() + " Price : "
+                    + slavePoses[0].StopOrderRedLine, LogMessageType.System);
             }
         }
 
@@ -892,13 +1040,12 @@ namespace OsEngine.Robots.FoundBots
         {
             List<Position> myPoses = tab.PositionsOpenAll;
 
-            SaveCompareDataInPositions(slavePosAll, tab.PositionsAll, tab.TimeServerCurrent);
+            //SaveCompareDataInPositions(slavePosAll, tab.PositionsAll, tab.TimeServerCurrent);
 
             // тупо копируем т.к. у нас нет позиций
 
             if (slavePosActual.Count != 0 && myPoses.Count == 0)
             {
-                UpdateDepositBalance();
                 for (int i = 0; i < slavePosActual.Count; i++)
                 {
                     OpenPose(slavePosActual[i], tab);
@@ -974,9 +1121,11 @@ namespace OsEngine.Robots.FoundBots
                 {
                     decimal redLine = stops[i].PriceRedLine - stops[i].PriceRedLine * ShiftToStopOpdersValue.ValueDecimal / 100;
 
+                    decimal orderPrice = redLine + (SlippageInter.ValueDecimal * redLine / 100);
+
                     tab.BuyAtStop(
-                        GetBuyVolume(),
-                        redLine + (SlippageInter.ValueDecimal * redLine / 100),
+                        GetVolume(orderPrice),
+                        orderPrice,
                         redLine,
                         stops[i].ActivateType, stops[i].TimeCreate.ToString());
                     tab.SetNewLogMessage(
@@ -988,9 +1137,11 @@ namespace OsEngine.Robots.FoundBots
                 {
                     decimal redLine = stops[i].PriceRedLine + stops[i].PriceRedLine * ShiftToStopOpdersValue.ValueDecimal / 100;
 
+                    decimal orderPrice = redLine - (SlippageInter.ValueDecimal * redLine / 100);
+
                     tab.SellAtStop(
-                        GetSellVolume(),
-                        redLine - (SlippageInter.ValueDecimal * redLine / 100),
+                        GetVolume(orderPrice),
+                        orderPrice,
                         redLine,
                         stops[i].ActivateType, stops[i].TimeCreate.ToString());
                     tab.SetNewLogMessage(
@@ -1084,13 +1235,21 @@ namespace OsEngine.Robots.FoundBots
                 Position pos = slavePoses.Find(p => p.Direction == Side.Buy);
 
                 if (pos != null &&
-                    _numsPositionAlreadyUsed.Find(p => p.TimeOpen == pos.TimeOpen) == null &&
                     CanReOpen(pos, tab))
                 {
-                    _numsPositionAlreadyUsed.Add(pos);
+                    for (int i = 0; i < _numsPositionAlreadyUsed.Count; i++)
+                    {
+                        if (_numsPositionAlreadyUsed[i] == pos.TimeOpen)
+                        {
+                            return;
+                        }
+                    }
+                    _numsPositionAlreadyUsed.Add(pos.TimeOpen);
 
-                    Position myPos = tab.BuyAtLimit(GetBuyVolume(),
-                        pos.EntryPrice + (SlippageInter.ValueDecimal * pos.EntryPrice / 100), pos.TimeOpen.ToString());
+                    decimal orderPrice = pos.EntryPrice + (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
+
+                    Position myPos = tab.BuyAtLimit(GetVolume(orderPrice),
+                        orderPrice, pos.TimeOpen.ToString());
                     _positionsToSupportOpenFirstTime.Add(myPos);
                     TabsSimple[0].SetNewLogMessage("В позиции на сопровождение новый лонг" + pos.Number, LogMessageType.System);
                 }
@@ -1099,13 +1258,22 @@ namespace OsEngine.Robots.FoundBots
             {
                 Position pos = slavePoses.Find(p => p.Direction == Side.Sell);
 
-                if (pos != null &&
-                    _numsPositionAlreadyUsed.Find(p => p.TimeOpen == pos.TimeOpen) == null
+                if (pos != null
                     && CanReOpen(pos, tab))
                 {
-                    _numsPositionAlreadyUsed.Add(pos);
-                    Position myPos = tab.SellAtLimit(GetSellVolume(),
-                        pos.EntryPrice - (SlippageInter.ValueDecimal * pos.EntryPrice / 100), pos.TimeOpen.ToString());
+                    for (int i = 0; i < _numsPositionAlreadyUsed.Count; i++)
+                    {
+                        if (_numsPositionAlreadyUsed[i] == pos.TimeOpen)
+                        {
+                            return;
+                        }
+                    }
+                    _numsPositionAlreadyUsed.Add(pos.TimeOpen);
+
+                    decimal orderPrice = pos.EntryPrice - (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
+
+                    Position myPos = tab.SellAtLimit(GetVolume(orderPrice),
+                        orderPrice, pos.TimeOpen.ToString());
                     _positionsToSupportOpenFirstTime.Add(myPos);
                     TabsSimple[0].SetNewLogMessage("В позиции на сопровождение новый шорт" + pos.Number, LogMessageType.System);
                 }
@@ -1242,7 +1410,6 @@ namespace OsEngine.Robots.FoundBots
                 return;
             }
 
-            UpdateDepositBalance();
             for (int i = 0; i < slavePoses.Count; i++)
             {
                 if (tab.PositionsOpenAll.Count >= MaxPositionDuplicateCount.ValueInt)
@@ -1256,12 +1423,15 @@ namespace OsEngine.Robots.FoundBots
 
         private void OpenPose(Position pos, BotTabSimple tab)
         {
-            if (_numsPositionAlreadyUsed.Find(p => p.TimeOpen == pos.TimeOpen) != null)
+            for (int i = 0; i < _numsPositionAlreadyUsed.Count; i++)
             {
-                return;
+                if (_numsPositionAlreadyUsed[i] == pos.TimeOpen)
+                {
+                    return;
+                }
             }
 
-            _numsPositionAlreadyUsed.Add(pos);
+            _numsPositionAlreadyUsed.Add(pos.TimeOpen);
 
             if (pos.State == PositionStateType.Open ||
                 pos.State == PositionStateType.Opening)
@@ -1288,7 +1458,7 @@ namespace OsEngine.Robots.FoundBots
                     }
 
                     price += (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
-                    Position posMy = tab.BuyAtMarket(GetBuyVolume());
+                    Position posMy = tab.BuyAtLimit(GetVolume(price), price, pos.TimeOpen.ToString());
 
                     if (posMy != null)
                     {
@@ -1317,7 +1487,7 @@ namespace OsEngine.Robots.FoundBots
                     }
 
                     price -= (SlippageInter.ValueDecimal * pos.EntryPrice / 100);
-                    Position posMy = tab.SellAtMarket(GetSellVolume());
+                    Position posMy = tab.SellAtLimit(GetVolume(price), price, pos.TimeOpen.ToString());
                     if (posMy != null)
                     {
                         _positionsToSupportOpenFirstTime.Add(posMy);
@@ -1326,235 +1496,25 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
-        List<Position> _numsPositionAlreadyUsed = new List<Position>();
+        List<DateTime> _numsPositionAlreadyUsed = new List<DateTime>();
 
-        private decimal GetBuyVolume()
-        {
-            return GetVolume(Side.Buy);
-        }
-
-        private decimal GetSellVolume()
-        {
-            return GetVolume(Side.Sell);
-        }
-
-        private decimal GetVolume(Side side)
+        private decimal GetVolume(decimal contractPrice)
         {
             decimal volume = VolumeOnPosition.ValueDecimal;
             // "Кол-во контрактов", "Валюта контракта", "% от Общего объёма портфеля"
 
-            VolumeRegimeType volumeRegimeType = GetVolumeRegimeType();
-            if (volumeRegimeType == VolumeRegimeType.CONTRACT_CURRENCY || volumeRegimeType == VolumeRegimeType.PORTFOLIO_PERCENT)
-            {
-                decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
-                decimal slippage = price * SlippageInter.ValueDecimal / 100;
-                price = side == Side.Buy ? price + slippage : price - slippage;
-
-                if (volumeRegimeType == VolumeRegimeType.CONTRACT_CURRENCY)
-                {
-                    volume = Math.Round(volume / price, VolumeDecimals.ValueInt);
-                }
-                else if (volumeRegimeType == VolumeRegimeType.PORTFOLIO_PERCENT)
-                {
-                    decimal portfolioPercent = VolumeOnPosition.ValueDecimal;
-                    volume = Math.Round(StaticPortfolioValue / 100 * portfolioPercent / price, VolumeDecimals.ValueInt);
-                }
-            }
-
-            return volume;
-        }
-
-        private VolumeRegimeType GetVolumeRegimeType()
-        {
-            VolumeRegimeType volumeRegimeType = VolumeRegimeType.CONTRACTS_NUMBER;
             if (VolumeRegime.ValueString == "Валюта контракта")
             {
-                volumeRegimeType = VolumeRegimeType.CONTRACT_CURRENCY;
+                volume = Math.Round(VolumeOnPosition.ValueDecimal / contractPrice, VolumeDecimals.ValueInt);
             }
             else if (VolumeRegime.ValueString == "% от Общего объёма портфеля")
             {
-                volumeRegimeType = VolumeRegimeType.PORTFOLIO_PERCENT;
-            }
-            return volumeRegimeType;
-        }
-
-        #endregion
-
-        #region Сранвивание оригинальных позиций из тестера с тем что есть в реале
-
-        public List<PositionReport> PositionReports = new List<PositionReport>();
-
-        private DateTime _lastTimeSaveReport;
-
-        private void SaveCompareDataInPositions(List<Position> slavePositions, List<Position> realPositions, DateTime time)
-        {
-            if (slavePositions == null ||
-                slavePositions.Count == 0)
-            {
-                return;
+                volume = Math.Round(
+                    (StaticPortfolioValue * (VolumeOnPosition.ValueDecimal / 100)) / contractPrice,
+                    VolumeDecimals.ValueInt);
             }
 
-            if (_lastTimeSaveReport.AddSeconds(30) > time)
-            {
-                return;
-            }
-
-            _lastTimeSaveReport = time;
-
-            for (int i = 0; i < slavePositions.Count; i++)
-            {
-                if (slavePositions[i].State == PositionStateType.OpeningFail ||
-                    slavePositions[i].EntryPrice == 0)
-                {
-                    continue;
-                }
-
-                PositionReport report =
-                    PositionReports.Find(p => p.TimeOpenSlave == slavePositions[i].TimeOpen);
-
-                if (report == null)
-                {
-                    report = new PositionReport();
-                    report.PosNumSlave = slavePositions[i].Number;
-                    report.EnterPriceSlave = slavePositions[i].EntryPrice;
-                    report.TimeOpenSlave = slavePositions[i].TimeOpen;
-                    report.Side = slavePositions[i].Direction;
-                    PositionReports.Add(report);
-                }
-
-                if (slavePositions[i].ClosePrice != 0 && report.ExitPriceSlave == 0)
-                {
-                    report.ExitPriceSlave = slavePositions[i].ClosePrice;
-                    report.TimeExitSlave = slavePositions[i].TimeClose;
-                    SavePositionReports();
-                }
-            }
-
-            if (realPositions == null ||
-                realPositions.Count == 0)
-            {
-                return;
-            }
-
-            for (int i = 0; i < realPositions.Count; i++)
-            {
-                Position posReal = realPositions[i];
-
-                if (string.IsNullOrEmpty(posReal.SignalTypeOpen))
-                {
-                    continue;
-                }
-
-                Position posSlave = null;
-
-                try
-                {
-                    posSlave = slavePositions.Find(p =>
-                    p.TimeOpen == Convert.ToDateTime(posReal.SignalTypeOpen));
-                }
-                catch
-                {
-                    // ignore
-                }
-
-                if (posSlave == null)
-                {
-                    continue;
-                }
-                PositionReport report = PositionReports.Find(p =>
-                    p.TimeOpenSlave == Convert.ToDateTime(posReal.SignalTypeOpen));
-
-                CheckReport(posReal, posSlave, report);
-            }
-        }
-
-        private void CheckReport(Position posReal, Position posSlave, PositionReport report)
-        {
-            // сначала смотрим цену закрытия, если такая есть в слайв позиции
-
-
-            if (posReal == null ||
-                posReal.State == PositionStateType.OpeningFail)
-            {
-                return;
-            }
-
-            if (posReal.State == PositionStateType.Done)
-            {
-                report.TimeExitReal = posReal.TimeClose;
-                report.TimeOpenReal = posReal.TimeOpen;
-                report.EnterPriceReal = posReal.EntryPrice;
-                report.ExitPriceReal = posReal.ClosePrice;
-                report.PosNumReal = posReal.Number;
-
-                SavePositionReports();
-            }
-        }
-
-        private void SavePositionReports()
-        {
-            if (StartProgram != StartProgram.IsOsTrader)
-            {
-                return;
-            }
-            try
-            {
-                using (StreamWriter writer = new StreamWriter(@"Engine\" + NameStrategyUniq + @"PositionReports.txt", false)
-                )
-                {
-                    for (int i = 0; i < PositionReports.Count; i++)
-                    {
-                        writer.WriteLine(PositionReports[i].GetSaveString());
-                    }
-
-                    writer.Close();
-                }
-            }
-            catch (Exception)
-            {
-                // ignore
-            }
-
-        }
-
-        private void LoadPositionReports()
-        {
-            if (StartProgram != StartProgram.IsOsTrader)
-            {
-                return;
-            }
-            if (!File.Exists(@"Engine\" + NameStrategyUniq + @"PositionReports.txt"))
-            {
-                return;
-            }
-            try
-            {
-                using (StreamReader reader = new StreamReader(@"Engine\" + NameStrategyUniq + @"PositionReports.txt"))
-                {
-
-                    while (reader.EndOfStream == false)
-                    {
-                        PositionReport report = new PositionReport();
-                        report.LoadFromString(reader.ReadLine());
-                        PositionReports.Add(report);
-                    }
-
-                    reader.Close();
-                }
-            }
-            catch (Exception)
-            {
-                // ignore
-            }
-        }
-
-        public void DeleteCurReports()
-        {
-            if (File.Exists(@"Engine\" + NameStrategyUniq + @"PositionReports.txt"))
-            {
-                File.Delete(@"Engine\" + NameStrategyUniq + @"PositionReports.txt");
-            }
-            PositionReports.Clear();
+            return volume;
         }
 
         #endregion
@@ -1679,11 +1639,6 @@ namespace OsEngine.Robots.FoundBots
 
         private void PositionSupportThread()
         {
-            Load(_positionsToSupportOpenFirstTime, "firstOpen");
-            Load(_positionsToSupportOpenSecondTime, "secondOpen");
-            Load(_positionsToSupportCloseFirstTime, "firstClose");
-            Load(_positionsToSupportCloseSecondTime, "secondClose");
-
             if (StartProgram != StartProgram.IsOsTrader)
             {
                 return;
@@ -1769,10 +1724,6 @@ namespace OsEngine.Robots.FoundBots
                 // отзываем через N времени из второго, в третий
                 // в третьем закрываем тогда когда у робота нет совсем позиций или противоположная
 
-                SavePosArrays(_positionsToSupportOpenFirstTime, "firstOpen");
-                SavePosArrays(_positionsToSupportOpenSecondTime, "secondOpen");
-                SavePosArrays(_positionsToSupportCloseFirstTime, "firstClose");
-                SavePosArrays(_positionsToSupportCloseSecondTime, "secondClose");
             }
             catch (Exception error)
             {
@@ -2023,50 +1974,21 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
-        private void SavePosArrays(List<Position> positions, string name)
-        {
-            try
-            {
-                using (StreamWriter writer = new StreamWriter(@"Engine\" + NameStrategyUniq + name + @"SupportPoses.txt", false)
-                )
-                {
-                    for (int i = 0; i < positions.Count; i++)
-                    {
-                        writer.WriteLine(positions[i].GetStringForSave());
-                    }
-
-                    writer.Close();
-                }
-            }
-            catch (Exception)
-            {
-                // ignore
-            }
-        }
-
-        private void Load(List<Position> positions, string name)
+        private void ClearSavePoses(string name)
         {
             if (!File.Exists(@"Engine\" + NameStrategyUniq + name + @"SupportPoses.txt"))
             {
                 return;
             }
+
+
             try
             {
-                using (StreamReader reader = new StreamReader(@"Engine\" + NameStrategyUniq + name + @"SupportPoses.txt"))
-                {
-                    while (reader.EndOfStream == false)
-                    {
-                        Position pos = new Position();
-                        pos.SetDealFromString(reader.ReadLine());
-                        positions.Add(pos);
-                    }
-
-                    reader.Close();
-                }
+                File.Delete(@"Engine\" + NameStrategyUniq + name + @"SupportPoses.txt");
             }
             catch (Exception)
             {
-                // ignore
+                return;
             }
         }
 
@@ -2085,6 +2007,7 @@ namespace OsEngine.Robots.FoundBots
                 {
                     StaticPortfolioValue = balance;
                     SaveStaticPortfolio();
+                    OlegUtils.Log("Updated balance to = {0} USDT", balance);
                 }
             }
             catch { }
@@ -2297,13 +2220,6 @@ namespace OsEngine.Robots.FoundBots
             }
         }
 
-    }
-
-    internal enum VolumeRegimeType
-    {
-        CONTRACTS_NUMBER,
-        CONTRACT_CURRENCY,
-        PORTFOLIO_PERCENT
     }
 
     internal static class DepositBalanceReader
