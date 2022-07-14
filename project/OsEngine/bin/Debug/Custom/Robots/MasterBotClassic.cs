@@ -2008,7 +2008,6 @@ namespace OsEngine.Robots.FoundBots
                 {
                     StaticPortfolioValue = balance;
                     SaveStaticPortfolio();
-                    OlegUtils.Log("Updated balance to = {0} USDT", balance);
                 }
             }
             catch { }
