@@ -82,13 +82,9 @@ namespace OsEngine.Robots.FoundBots
                     writer.Close();
                 }
             }
-            catch (IOException error)
-            {
-                // ignore
-            }
             catch (Exception error)
             {
-                MessageBox.Show(error.ToString());
+                // ignore
             }
         }
 
