@@ -46,7 +46,6 @@ namespace OsEngine.Robots.Oleg.Good
             _lengthZZ = CreateParameter("Length ZZ", 50, 50, 200, 20, "Robot parameters");
 
             SmaLengthFilter = CreateParameter("Sma Length", 100, 10, 500, 1, "Filters");
-
             SmaPositionFilterIsOn = CreateParameter("Is SMA Filter On", false, "Filters");
             SmaSlopeFilterIsOn = CreateParameter("Is Sma Slope Filter On", false, "Filters");
 
@@ -56,17 +55,17 @@ namespace OsEngine.Robots.Oleg.Good
             _smaFilter.ParametersDigit[0].Value = SmaLengthFilter.ValueInt;
             _smaFilter.Save();
 
-            _zz = IndicatorsFactory.CreateIndicatorByName(nameClass: "ZigZagChannel_indicator", name: name + "ZigZagChannel", canDelete: false);
+            _zz = IndicatorsFactory.CreateIndicatorByName(nameClass: "ZigZagIndicator", name: name + "ZigZag", canDelete: false);
             _zz = (Aindicator)_tab.CreateCandleIndicator(_zz, nameArea: "Prime");
             _zz.ParametersDigit[0].Value = _lengthZZ.ValueInt;
             _zz.Save();
 
-            ParametrsChangeByUser += LRegBot_ParametrsChangeByUser;
             _tab.CandleFinishedEvent += _tab_CandleFinishedEvent;
-            LRegBot_ParametrsChangeByUser();
+            ParametrsChangeByUser += DivergenceContrTrend_ParametrsChangeByUserEventHandler;
+            DivergenceContrTrend_ParametrsChangeByUserEventHandler();
         }
 
-        private void LRegBot_ParametrsChangeByUser()
+        private void DivergenceContrTrend_ParametrsChangeByUserEventHandler()
         {
             if (_zz.ParametersDigit[0].Value != _lengthZZ.ValueInt)
             {
@@ -82,19 +81,10 @@ namespace OsEngine.Robots.Oleg.Good
                 _smaFilter.Save();
             }
 
-
             if (_smaFilter.DataSeries != null && _smaFilter.DataSeries.Count > 0)
             {
-                if (!SmaPositionFilterIsOn.ValueBool)
-                {
-                    _smaFilter.DataSeries[0].IsPaint = false;
-                }
-                else
-                {
-                    _smaFilter.DataSeries[0].IsPaint = true;
-                }
+                _smaFilter.DataSeries[0].IsPaint = SmaPositionFilterIsOn.ValueBool;
             }
-
         }
 
         public override string GetNameStrategyType()
@@ -102,12 +92,7 @@ namespace OsEngine.Robots.Oleg.Good
             return "DivergenceContrTrend";
         }
 
-        public override void ShowIndividualSettingsDialog()
-        {
-
-        }
-
-        // логика
+        public override void ShowIndividualSettingsDialog() { }
 
         private void _tab_CandleFinishedEvent(List<Candle> candles)
         {
@@ -222,7 +207,6 @@ namespace OsEngine.Robots.Oleg.Good
             for (int i = 0; i < positions.Count; i++)
             {
                 Position pos = positions[i];
-
                 pos.StopOrderIsActiv = false;
                 pos.ProfitOrderIsActiv = false;
             }
@@ -246,7 +230,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (SmaPositionFilterIsOn.ValueBool)
             {
-                if (_smaFilter.DataSeries[0].Last > lastPrice)
+                if (lastSma > lastPrice)
                 {
                     return true;
                 }
@@ -255,8 +239,7 @@ namespace OsEngine.Robots.Oleg.Good
             if (SmaSlopeFilterIsOn.ValueBool)
             {
                 decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
-
-                if (lastSma > prevSma)
+                if (lastSma < prevSma)
                 {
                     return true;
                 }
@@ -289,7 +272,6 @@ namespace OsEngine.Robots.Oleg.Good
             if (SmaSlopeFilterIsOn.ValueBool)
             {
                 decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
-
                 if (lastSma > prevSma)
                 {
                     return true;

@@ -232,7 +232,6 @@ public class BreakZZChannel : BotPanel
 
     private bool BuySignalIsFiltered(List<Candle> candles)
     {
-
         decimal lastPrice = candles[candles.Count - 1].Close;
         decimal lastSma = _smaFilter.DataSeries[0].Last;
         // фильтр для покупок
@@ -246,7 +245,7 @@ public class BreakZZChannel : BotPanel
 
         if (SmaPositionFilterIsOn.ValueBool)
         {
-            if (_smaFilter.DataSeries[0].Last > lastPrice)
+            if (lastSma > lastPrice)
             {
                 return true;
             }
@@ -255,8 +254,7 @@ public class BreakZZChannel : BotPanel
         if (SmaSlopeFilterIsOn.ValueBool)
         {
             decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
-
-            if (lastSma > prevSma)
+            if (lastSma < prevSma)
             {
                 return true;
             }
@@ -289,7 +287,6 @@ public class BreakZZChannel : BotPanel
         if (SmaSlopeFilterIsOn.ValueBool)
         {
             decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
-
             if (lastSma > prevSma)
             {
                 return true;
