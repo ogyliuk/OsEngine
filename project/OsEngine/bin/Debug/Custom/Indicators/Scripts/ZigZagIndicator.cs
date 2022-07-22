@@ -10,7 +10,7 @@ namespace CustomIndicators.Scripts
     public class ZigZagIndicator : Aindicator
     {
         private IndicatorParameterInt _period;
-        private IndicatorDataSeries _seriesZigZagLinePointsOfAllCandles;
+        private IndicatorDataSeries _seriesAllZigZagLineDots;
         private IndicatorDataSeries _seriesPeakPricesAll;
         private IndicatorDataSeries _seriesPeakPricesHigh;
         private IndicatorDataSeries _seriesPeakPricesLow;
@@ -23,21 +23,25 @@ namespace CustomIndicators.Scripts
         {
             _period = CreateParameterInt("Length", 14);
 
-            _seriesPeakPricesAll = CreateSeries("ZigZag", Color.CornflowerBlue, IndicatorChartPaintType.Point, false);
+            _seriesPeakPricesAll = CreateSeries("ZigZagPeaksAll", Color.CornflowerBlue, IndicatorChartPaintType.Point, false);
             _seriesPeakPricesAll.CanReBuildHistoricalValues = true;
 
-            _seriesZigZagLinePointsOfAllCandles = CreateSeries("ZigZagLine", Color.CornflowerBlue, IndicatorChartPaintType.Point, true);
-            _seriesZigZagLinePointsOfAllCandles.CanReBuildHistoricalValues = true;
+            _seriesAllZigZagLineDots = CreateSeries("ZigZagLineDots", Color.CornflowerBlue, IndicatorChartPaintType.Point, true);
+            _seriesAllZigZagLineDots.CanReBuildHistoricalValues = true;
 
-            _seriesPeakPricesHigh = CreateSeries("_seriesZigZagHighs", Color.GreenYellow, IndicatorChartPaintType.Point, false);
+            _seriesPeakPricesHigh = CreateSeries("ZigZagPeaksHigh", Color.GreenYellow, IndicatorChartPaintType.Point, false);
             _seriesPeakPricesHigh.CanReBuildHistoricalValues = true;
 
-            _seriesPeakPricesLow = CreateSeries("_seriesZigZagLows", Color.Red, IndicatorChartPaintType.Point, false);
+            _seriesPeakPricesLow = CreateSeries("ZigZagPeaksLow", Color.Red, IndicatorChartPaintType.Point, false);
             _seriesPeakPricesLow.CanReBuildHistoricalValues = true;
         }
 
         public override void OnProcess(List<Candle> candles, int index)
         {
+            // NOTE: before this method call 0 value has been already set
+            // for all 4 data series for this 'index' and we just need to decide
+            // whether we want to override this 0 by some another value
+
             if (index < _period.ValueInt * 2)
             {
                 _trendDirection = 0;
@@ -135,7 +139,7 @@ namespace CustomIndicators.Scripts
 
                 if (betterUpPeakCandidateFound || betterDownPeakCandidateFound)
                 {
-                    ReCalcZigZagLinePointsForAllCandles(_seriesPeakPricesAll.Values, _seriesZigZagLinePointsOfAllCandles.Values);
+                    ReCalcAllZigZagLineDots(_seriesPeakPricesAll.Values, _seriesAllZigZagLineDots.Values);
                 }
             }
         }
@@ -163,7 +167,7 @@ namespace CustomIndicators.Scripts
             return 0;
         }
 
-        private void ReCalcZigZagLinePointsForAllCandles(List<decimal> allPeaksPrices, List<decimal> zigZagLinePointsOfAllCandles)
+        private void ReCalcAllZigZagLineDots(List<decimal> allPeaksPrices, List<decimal> zigZagLinePointsOfAllCandles)
         {
             decimal previousPeakPrice = 0;
             int previousPeakPriceIndex = 0;
