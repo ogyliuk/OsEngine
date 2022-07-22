@@ -117,79 +117,75 @@ namespace OsEngine.Robots.Oleg.Good
                 return;
             }
 
+            decimal slippage = 0;
             List<Position> positions = _tab.PositionsOpenAll;
             decimal lastCandleClosePrice = candles[candles.Count - 1].Close;
-            decimal bb_up = _zz.DataSeries[4].Last;
-            decimal bb_down = _zz.DataSeries[5].Last;
-
             decimal lastMaFilter = _smaFilter.DataSeries[0].Last;
-            if (bb_down <= 0) return;
-            if (bb_up <= 0) return;
+            decimal zzChannelUp = _zz.DataSeries[4].Last;
+            decimal zzChannelDown = _zz.DataSeries[5].Last;
 
-            decimal _slippage = 0;
+            // _zz.DataSeries[2].Last; - ZigZag Highs
+            // _zz.DataSeries[3].Last; - ZigZag Lows
+
+            if (zzChannelDown <= 0 || zzChannelUp <= 0)
+            {
+                return;
+            }
 
             if (positions.Count == 0)
-            {// enter logic
-
-                if (bb_down > bb_up)
+            {
+                if (zzChannelDown > zzChannelUp)
                 {
                     return;
                 }
-                _slippage = Slippage.ValueDecimal * bb_up / 100;
 
+                // LONG
+                slippage = Slippage.ValueDecimal * zzChannelUp / 100;
                 if (!BuySignalIsFiltered(candles))
                 {
-                    // если мы уже выше уровня покупок - ничего не делаем
-                    if (lastCandleClosePrice > bb_up + _slippage)
+                    bool alreadyOutOfChannel = lastCandleClosePrice > zzChannelUp + slippage;
+                    if (alreadyOutOfChannel)
                     {
                         return;
                     }
-
-                    _tab.BuyAtStop(GetVolume(), bb_up + _slippage, bb_up, StopActivateType.HigherOrEqual, 1);
+                    _tab.BuyAtStop(GetVolume(), zzChannelUp + slippage, zzChannelUp, StopActivateType.HigherOrEqual, 1);
                 }
-                _slippage = Slippage.ValueDecimal * bb_down / 100;
 
+                // SHORT
+                slippage = Slippage.ValueDecimal * zzChannelDown / 100;
                 if (!SellSignalIsFiltered(candles))
                 {
-                    // если мы уже ниже уровня продаж - ничего не делаем
-                    if (lastCandleClosePrice < bb_down - _slippage)
+                    bool alreadyOutOfChannel = lastCandleClosePrice < zzChannelDown - slippage;
+                    if (alreadyOutOfChannel)
                     {
                         return;
                     }
-
-                    _tab.SellAtStop(GetVolume(), bb_down - _slippage, bb_down, StopActivateType.LowerOrEqyal, 1);
+                    _tab.SellAtStop(GetVolume(), zzChannelDown - slippage, zzChannelDown, StopActivateType.LowerOrEqyal, 1);
                 }
             }
             else
-            {//exit logic
+            {
                 for (int i = 0; i < positions.Count; i++)
                 {
                     _tab.BuyAtStopCancel();
                     _tab.SellAtStopCancel();
 
-                    if (positions[i].State != PositionStateType.Open)
+                    if (positions[i].State == PositionStateType.Open)
                     {
-                        continue;
+                        decimal stopLevel = 0;
+                        if (positions[i].Direction == Side.Buy)
+                        {
+                            stopLevel = zzChannelDown > lastMaFilter ? zzChannelDown : lastMaFilter;
+                            slippage = Slippage.ValueDecimal * stopLevel / 100;
+                            _tab.CloseAtTrailingStop(positions[i], stopLevel, stopLevel - slippage);
+                        }
+                        else if (positions[i].Direction == Side.Sell)
+                        {
+                            stopLevel = zzChannelUp < lastMaFilter && zzChannelUp > 0 ? zzChannelUp : lastMaFilter;
+                            slippage = Slippage.ValueDecimal * stopLevel / 100;
+                            _tab.CloseAtTrailingStop(positions[i], stopLevel, stopLevel + slippage);
+                        }
                     }
-                    decimal stop_level = 0;
-
-                    if (positions[i].Direction == Side.Buy)
-                    {// logic to close long position
-                        stop_level = bb_down > lastMaFilter ? bb_down : lastMaFilter;
-                        _slippage = Slippage.ValueDecimal * stop_level / 100;
-
-                        //   _tab.CloseAtStop(positions[i], stop_level, stop_level - _slippage.ValueInt * _tab.Securiti.PriceStep);
-                        _tab.CloseAtTrailingStop(positions[i], stop_level, stop_level - _slippage);
-                    }
-                    else if (positions[i].Direction == Side.Sell)
-                    {//logic to close short position
-                        stop_level = bb_up < lastMaFilter && bb_up > 0 ? bb_up : lastMaFilter;
-                        _slippage = Slippage.ValueDecimal * stop_level / 100;
-
-                        // _tab.CloseAtStop(positions[i], stop_level, stop_level + _slippage.ValueInt * _tab.Securiti.PriceStep);
-                        _tab.CloseAtTrailingStop(positions[i], stop_level, stop_level + _slippage);
-                    }
-
                 }
             }
         }
@@ -209,15 +205,14 @@ namespace OsEngine.Robots.Oleg.Good
 
         private bool BuySignalIsFiltered(List<Candle> candles)
         {
-            decimal lastPrice = candles[candles.Count - 1].Close;
             decimal lastSma = _smaFilter.DataSeries[0].Last;
-            // фильтр для покупок
+            decimal lastPrice = candles[candles.Count - 1].Close;
+
             if (Regime.ValueString == "Off" ||
                 Regime.ValueString == "OnlyShort" ||
                 Regime.ValueString == "OnlyClosePosition")
             {
                 return true;
-                //если режим работы робота не соответсвует направлению позиции
             }
 
             if (SmaPositionFilterIsOn.ValueBool)
@@ -226,8 +221,8 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     return true;
                 }
-                // если цена ниже последней сма - возвращаем на верх true
             }
+
             if (SmaSlopeFilterIsOn.ValueBool)
             {
                 decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
@@ -235,7 +230,6 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     return true;
                 }
-                // если последняя сма ниже предыдущей сма - возвращаем на верх true
             }
 
             return false;
@@ -243,24 +237,24 @@ namespace OsEngine.Robots.Oleg.Good
 
         private bool SellSignalIsFiltered(List<Candle> candles)
         {
-            decimal lastPrice = candles[candles.Count - 1].Close;
             decimal lastSma = _smaFilter.DataSeries[0].Last;
-            // фильтр для продаж
+            decimal lastPrice = candles[candles.Count - 1].Close;
+
             if (Regime.ValueString == "Off" ||
                 Regime.ValueString == "OnlyLong" ||
                 Regime.ValueString == "OnlyClosePosition")
             {
                 return true;
-                //если режим работы робота не соответсвует направлению позиции
             }
+
             if (SmaPositionFilterIsOn.ValueBool)
             {
                 if (lastSma < lastPrice)
                 {
                     return true;
                 }
-                // если цена выше последней сма - возвращаем на верх true
             }
+
             if (SmaSlopeFilterIsOn.ValueBool)
             {
                 decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
@@ -268,7 +262,6 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     return true;
                 }
-                // если последняя сма выше предыдущей сма - возвращаем на верх true
             }
 
             return false;
