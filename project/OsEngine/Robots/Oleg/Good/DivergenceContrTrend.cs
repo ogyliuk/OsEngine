@@ -11,23 +11,22 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("DivergenceContrTrend")]
     public class DivergenceContrTrend : BotPanel
     {
-        BotTabSimple _tab;
-        StrategyParameterString Regime;
-        public StrategyParameterDecimal VolumeOnPosition;
-        public StrategyParameterString VolumeRegime;
-        public StrategyParameterInt VolumeDecimals;
-        StrategyParameterDecimal Slippage;
+        private BotTabSimple _tab;
+        
+        private Aindicator _zz;
+        private Aindicator _smaFilter;
 
+        private StrategyParameterInt LengthZZ;
+        private StrategyParameterString Regime;
+        private StrategyParameterDecimal Slippage;
         private StrategyParameterTimeOfDay TimeStart;
         private StrategyParameterTimeOfDay TimeEnd;
-
-        public Aindicator _smaFilter;
         private StrategyParameterInt SmaLengthFilter;
-        public StrategyParameterBool SmaPositionFilterIsOn;
-        public StrategyParameterBool SmaSlopeFilterIsOn;
-
-        Aindicator _zz;
-        StrategyParameterInt _lengthZZ;
+        private StrategyParameterDecimal VolumeOnPosition;
+        private StrategyParameterString VolumeRegime;
+        private StrategyParameterInt VolumeDecimals;
+        private StrategyParameterBool SmaPositionFilterIsOn;
+        private StrategyParameterBool SmaSlopeFilterIsOn;
 
         public DivergenceContrTrend(string name, StartProgram startProgram) : base(name, startProgram)
         {
@@ -43,7 +42,7 @@ namespace OsEngine.Robots.Oleg.Good
             TimeStart = CreateParameterTimeOfDay("Start Trade Time", 0, 0, 0, 0, "Base");
             TimeEnd = CreateParameterTimeOfDay("End Trade Time", 24, 0, 0, 0, "Base");
 
-            _lengthZZ = CreateParameter("Length ZZ", 50, 50, 200, 20, "Robot parameters");
+            LengthZZ = CreateParameter("Length ZZ", 50, 50, 200, 20, "Robot parameters");
 
             SmaLengthFilter = CreateParameter("Sma Length", 100, 10, 500, 1, "Filters");
             SmaPositionFilterIsOn = CreateParameter("Is SMA Filter On", false, "Filters");
@@ -57,7 +56,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             _zz = IndicatorsFactory.CreateIndicatorByName(nameClass: "ZigZagIndicator", name: name + "ZigZag", canDelete: false);
             _zz = (Aindicator)_tab.CreateCandleIndicator(_zz, nameArea: "Prime");
-            _zz.ParametersDigit[0].Value = _lengthZZ.ValueInt;
+            _zz.ParametersDigit[0].Value = LengthZZ.ValueInt;
             _zz.Save();
 
             _tab.CandleFinishedEvent += _tab_CandleFinishedEvent;
@@ -67,9 +66,9 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void DivergenceContrTrend_ParametrsChangeByUserEventHandler()
         {
-            if (_zz.ParametersDigit[0].Value != _lengthZZ.ValueInt)
+            if (_zz.ParametersDigit[0].Value != LengthZZ.ValueInt)
             {
-                _zz.ParametersDigit[0].Value = _lengthZZ.ValueInt;
+                _zz.ParametersDigit[0].Value = LengthZZ.ValueInt;
                 _zz.Reload();
                 _zz.Save();
             }
@@ -100,24 +99,19 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 return;
             }
-
-            if (TimeStart.Value > _tab.TimeServerCurrent ||
-                TimeEnd.Value < _tab.TimeServerCurrent)
+            if (TimeStart.Value > _tab.TimeServerCurrent || TimeEnd.Value < _tab.TimeServerCurrent)
             {
                 CancelStopsAndProfits();
                 return;
             }
-
             if (_tab.CandlesAll == null)
             {
                 return;
             }
-            if (_lengthZZ.ValueInt >= candles.Count)
-
+            if (LengthZZ.ValueInt >= candles.Count)
             {
                 return;
             }
-
             if (SmaLengthFilter.ValueInt >= candles.Count)
             {
                 return;
@@ -203,14 +197,12 @@ namespace OsEngine.Robots.Oleg.Good
         private void CancelStopsAndProfits()
         {
             List<Position> positions = _tab.PositionsOpenAll;
-
             for (int i = 0; i < positions.Count; i++)
             {
                 Position pos = positions[i];
                 pos.StopOrderIsActiv = false;
                 pos.ProfitOrderIsActiv = false;
             }
-
             _tab.BuyAtStopCancel();
             _tab.SellAtStopCancel();
         }
