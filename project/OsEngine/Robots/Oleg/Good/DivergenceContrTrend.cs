@@ -136,22 +136,7 @@ namespace OsEngine.Robots.Oleg.Good
                 slippage = Slippage.ValueDecimal * lastCandleClosePrice / 100;
 
                 // LONG
-                if (currentCandleHighPeakCandidate && !BuySignalIsFiltered(candles))
-                {
-                    int lastCompletedHighPeakIndex = GetLastCompletedHighPeakIndex();
-                    if (lastCompletedHighPeakIndex != -1)
-                    {
-                        decimal lastCompletedHighPeakPrice = ZigZagHighPeaks.Values[lastCompletedHighPeakIndex];
-                        bool higherHigh = currentCandleHighPeakPrice > lastCompletedHighPeakPrice;
-                        if (higherHigh)
-                        {
-                            _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
-                        }
-                    }
-                }
-
-                // SHORT
-                if (currentCandleLowPeakCandidate && !SellSignalIsFiltered(candles))
+                if (currentCandleLowPeakCandidate && !BuySignalIsFiltered(candles))
                 {
                     int lastCompletedLowPeakIndex = GetLastCompletedLowPeakIndex();
                     if (lastCompletedLowPeakIndex != -1)
@@ -159,6 +144,21 @@ namespace OsEngine.Robots.Oleg.Good
                         decimal lastCompletedLowPeakPrice = ZigZagLowPeaks.Values[lastCompletedLowPeakIndex];
                         bool lowerLow = currentCandleLowPeakPrice < lastCompletedLowPeakPrice;
                         if (lowerLow)
+                        {
+                            _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
+                        }
+                    }
+                }
+
+                // SHORT
+                if (currentCandleHighPeakCandidate && !SellSignalIsFiltered(candles))
+                {
+                    int lastCompletedHighPeakIndex = GetLastCompletedHighPeakIndex();
+                    if (lastCompletedHighPeakIndex != -1)
+                    {
+                        decimal lastCompletedHighPeakPrice = ZigZagHighPeaks.Values[lastCompletedHighPeakIndex];
+                        bool higherHigh = currentCandleHighPeakPrice > lastCompletedHighPeakPrice;
+                        if (higherHigh)
                         {
                             _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
                         }
@@ -176,14 +176,9 @@ namespace OsEngine.Robots.Oleg.Good
                     {
                         decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
                         slippage = Slippage.ValueDecimal * lastSmaPrice / 100;
-                        if (position.Direction == Side.Buy)
-                        {
-                            _tab.CloseAtTrailingStop(position, lastSmaPrice, lastSmaPrice - slippage);
-                        }
-                        else if (position.Direction == Side.Sell)
-                        {
-                            _tab.CloseAtTrailingStop(position, lastSmaPrice, lastSmaPrice + slippage);
-                        }
+                        decimal priceOrder = position.Direction == Side.Buy ? lastSmaPrice - slippage : lastSmaPrice + slippage;
+
+                        _tab.CloseAtTrailingStop(position, lastSmaPrice, priceOrder);
                     }
                 }
             }
