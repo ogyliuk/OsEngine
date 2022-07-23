@@ -14,11 +14,14 @@ namespace OsEngine.Robots.Oleg.Good
         private BotTabSimple _tab;
         
         private Aindicator _zz;
-        private Aindicator _smaFilter;
+        private Aindicator _bollinger;
         private Aindicator _rsi;
+        private Aindicator _smaFilter;
 
         private StrategyParameterInt LengthZZ;
         private StrategyParameterInt LengthRSI;
+        private StrategyParameterInt LengthBollinger;
+        private StrategyParameterDecimal DeviationBollinger;
         private StrategyParameterString Regime;
         private StrategyParameterDecimal Slippage;
         private StrategyParameterTimeOfDay TimeStart;
@@ -49,6 +52,8 @@ namespace OsEngine.Robots.Oleg.Good
 
             LengthZZ = CreateParameter("Length ZZ", 15, 5, 200, 5, "Robot parameters");
             LengthRSI = CreateParameter("Length RSI", 14, 10, 50, 2, "Robot parameters");
+            LengthBollinger = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
+            DeviationBollinger = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
 
             SmaLengthFilter = CreateParameter("Sma Length", 100, 10, 500, 1, "Filters");
             SmaPositionFilterIsOn = CreateParameter("Is SMA Filter On", false, "Filters");
@@ -64,6 +69,12 @@ namespace OsEngine.Robots.Oleg.Good
             _zz = (Aindicator)_tab.CreateCandleIndicator(_zz, nameArea: "Prime");
             _zz.ParametersDigit[0].Value = LengthZZ.ValueInt;
             _zz.Save();
+
+            _bollinger = IndicatorsFactory.CreateIndicatorByName(nameClass: "Bollinger", name: name + "Bollinger", canDelete: false);
+            _bollinger = (Aindicator)_tab.CreateCandleIndicator(_bollinger, nameArea: "Prime");
+            _bollinger.ParametersDigit[0].Value = LengthBollinger.ValueInt;
+            _bollinger.ParametersDigit[1].Value = DeviationBollinger.ValueDecimal;
+            _bollinger.Save();
 
             _rsi = IndicatorsFactory.CreateIndicatorByName(nameClass: "RSI", name: name + "RSI", canDelete: false);
             _rsi = (Aindicator)_tab.CreateCandleIndicator(_rsi, nameArea: "RsiArea");
@@ -83,6 +94,15 @@ namespace OsEngine.Robots.Oleg.Good
                 _zz.ParametersDigit[0].Value = LengthZZ.ValueInt;
                 _zz.Reload();
                 _zz.Save();
+            }
+
+            if (_bollinger.ParametersDigit[0].Value != LengthBollinger.ValueInt || 
+                _bollinger.ParametersDigit[1].Value != DeviationBollinger.ValueDecimal)
+            {
+                _bollinger.ParametersDigit[0].Value = LengthBollinger.ValueInt;
+                _bollinger.ParametersDigit[1].Value = DeviationBollinger.ValueDecimal;
+                _bollinger.Reload();
+                _bollinger.Save();
             }
 
             if (_rsi.ParametersDigit[0].Value != LengthRSI.ValueInt)
@@ -128,6 +148,7 @@ namespace OsEngine.Robots.Oleg.Good
                 return;
             }
             if (LengthZZ.ValueInt >= candles.Count ||
+                LengthBollinger.ValueInt >= candles.Count ||
                 LengthRSI.ValueInt >= candles.Count ||
                 SmaLengthFilter.ValueInt >= candles.Count)
             {
@@ -190,11 +211,15 @@ namespace OsEngine.Robots.Oleg.Good
                     if (position.State == PositionStateType.Open)
                     {
                         bool longDeal = position.Direction == Side.Buy;
-                        decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
-                        bool shouldClose = longDeal ? lastCandleClosePrice > lastSmaPrice : lastCandleClosePrice < lastSmaPrice;
+
+                        decimal bollingerLastPriceUp = _bollinger.DataSeries[0].Last;
+                        decimal bollingerLastPriceDown = _bollinger.DataSeries[1].Last;
+                        decimal bollingerLastPriceCenter = _bollinger.DataSeries[2].Last;
+
+                        bool shouldClose = longDeal ? lastCandleClosePrice > bollingerLastPriceCenter : lastCandleClosePrice < bollingerLastPriceCenter;
                         if (shouldClose)
                         {
-                            decimal slippage = Slippage.ValueDecimal * lastSmaPrice / 100;
+                            decimal slippage = Slippage.ValueDecimal * lastCandleClosePrice / 100;
                             decimal closePrice = longDeal ? lastCandleClosePrice - slippage : lastCandleClosePrice + slippage;
                             _tab.CloseAtLimit(position, closePrice, position.OpenVolume);
                         }
