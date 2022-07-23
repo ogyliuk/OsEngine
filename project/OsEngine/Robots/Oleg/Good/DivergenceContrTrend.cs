@@ -216,7 +216,7 @@ namespace OsEngine.Robots.Oleg.Good
                         decimal bollingerLastPriceDown = _bollinger.DataSeries[1].Last;
                         decimal bollingerLastPriceCenter = _bollinger.DataSeries[2].Last;
 
-                        bool shouldClose = longDeal ? lastCandleClosePrice > bollingerLastPriceCenter : lastCandleClosePrice < bollingerLastPriceCenter;
+                        bool shouldClose = longDeal ? lastCandleClosePrice < bollingerLastPriceDown : lastCandleClosePrice > bollingerLastPriceUp;
                         if (shouldClose)
                         {
                             decimal slippage = Slippage.ValueDecimal * lastCandleClosePrice / 100;
