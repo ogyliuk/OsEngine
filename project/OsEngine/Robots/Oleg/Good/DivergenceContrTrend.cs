@@ -62,7 +62,8 @@ namespace OsEngine.Robots.Oleg.Good
             _zz.ParametersDigit[0].Value = LengthZZ.ValueInt;
             _zz.Save();
 
-            _tab.CandleFinishedEvent += _tab_CandleFinishedEvent;
+            _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
+            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
             ParametrsChangeByUser += DivergenceContrTrend_ParametrsChangeByUserEventHandler;
             DivergenceContrTrend_ParametrsChangeByUserEventHandler();
         }
@@ -96,7 +97,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         public override void ShowIndividualSettingsDialog() { }
 
-        private void _tab_CandleFinishedEvent(List<Candle> candles)
+        private void _tab_CandleFinishedEventHandler(List<Candle> candles)
         {
             if (Regime.ValueString == "Off")
             {
@@ -169,18 +170,48 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 foreach (Position position in _tab.PositionsOpenAll)
                 {
-                    _tab.BuyAtStopCancel();
-                    _tab.SellAtStopCancel();
+                    //_tab.BuyAtStopCancel();
+                    //_tab.SellAtStopCancel();
 
                     if (position.State == PositionStateType.Open)
                     {
+                        // TODO : check if need to move
+
                         decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
                         slippage = Slippage.ValueDecimal * lastSmaPrice / 100;
-                        decimal priceOrder = position.Direction == Side.Buy ? lastSmaPrice - slippage : lastSmaPrice + slippage;
+                        decimal TP_TriggerPrice = lastSmaPrice;
+                        decimal TP_Price = position.Direction == Side.Buy ? TP_TriggerPrice - slippage : TP_TriggerPrice + slippage;
 
-                        _tab.CloseAtTrailingStop(position, lastSmaPrice, priceOrder);
+                        //_tab.CloseAtTrailingStop(position, TP_TriggerPrice, TP_Price);
+                        _tab.CloseAtProfit(position, TP_TriggerPrice, TP_Price);
                     }
                 }
+            }
+        }
+
+        private void _tab_PositionOpenEventHandler(Position position)
+        {
+            decimal STOP_LOSS_SIZE_IN_PERCENTS = 1m;
+            if (position != null && position.State == PositionStateType.Open)
+            {
+                // Generic parameters
+                bool longDeal = position.Direction == Side.Buy;
+                decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
+                decimal slippage = position.EntryPrice * Slippage.ValueDecimal / 100;
+
+                // STOP LOSS
+                decimal SL_TriggerPrice = longDeal ? 
+                    position.EntryPrice * (100 - STOP_LOSS_SIZE_IN_PERCENTS) / 100 : 
+                    position.EntryPrice * (100 + STOP_LOSS_SIZE_IN_PERCENTS) / 100;
+                decimal SL_Price = longDeal ? SL_TriggerPrice - slippage : SL_TriggerPrice + slippage;
+
+                // TAKE PROFIT
+                decimal TP_TriggerPrice = lastSmaPrice;
+                decimal TP_Price = longDeal ? TP_TriggerPrice - slippage : TP_TriggerPrice + slippage;
+
+                // Orders
+                _tab.CloseAtStop(position, SL_TriggerPrice, SL_Price);
+                _tab.CloseAtProfit(position, TP_TriggerPrice, TP_Price);
             }
         }
 
