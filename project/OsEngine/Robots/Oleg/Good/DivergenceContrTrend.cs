@@ -15,8 +15,10 @@ namespace OsEngine.Robots.Oleg.Good
         
         private Aindicator _zz;
         private Aindicator _smaFilter;
+        private Aindicator _rsi;
 
         private StrategyParameterInt LengthZZ;
+        private StrategyParameterInt LengthRSI;
         private StrategyParameterString Regime;
         private StrategyParameterDecimal Slippage;
         private StrategyParameterTimeOfDay TimeStart;
@@ -45,7 +47,8 @@ namespace OsEngine.Robots.Oleg.Good
             TimeStart = CreateParameterTimeOfDay("Start Trade Time", 0, 0, 0, 0, "Base");
             TimeEnd = CreateParameterTimeOfDay("End Trade Time", 24, 0, 0, 0, "Base");
 
-            LengthZZ = CreateParameter("Length ZZ", 50, 50, 200, 20, "Robot parameters");
+            LengthZZ = CreateParameter("Length ZZ", 15, 5, 200, 5, "Robot parameters");
+            LengthRSI = CreateParameter("Length RSI", 14, 10, 50, 2, "Robot parameters");
 
             SmaLengthFilter = CreateParameter("Sma Length", 100, 10, 500, 1, "Filters");
             SmaPositionFilterIsOn = CreateParameter("Is SMA Filter On", false, "Filters");
@@ -62,6 +65,11 @@ namespace OsEngine.Robots.Oleg.Good
             _zz.ParametersDigit[0].Value = LengthZZ.ValueInt;
             _zz.Save();
 
+            _rsi = IndicatorsFactory.CreateIndicatorByName(nameClass: "RSI", name: name + "RSI", canDelete: false);
+            _rsi = (Aindicator)_tab.CreateCandleIndicator(_rsi, nameArea: "RsiArea");
+            _rsi.ParametersDigit[0].Value = LengthRSI.ValueInt;
+            _rsi.Save();
+
             _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
             // _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
             ParametrsChangeByUser += DivergenceContrTrend_ParametrsChangeByUserEventHandler;
@@ -75,6 +83,13 @@ namespace OsEngine.Robots.Oleg.Good
                 _zz.ParametersDigit[0].Value = LengthZZ.ValueInt;
                 _zz.Reload();
                 _zz.Save();
+            }
+
+            if (_rsi.ParametersDigit[0].Value != LengthRSI.ValueInt)
+            {
+                _rsi.ParametersDigit[0].Value = LengthRSI.ValueInt;
+                _rsi.Reload();
+                _rsi.Save();
             }
 
             if (_smaFilter.ParametersDigit[0].Value != SmaLengthFilter.ValueInt)
@@ -112,11 +127,9 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 return;
             }
-            if (LengthZZ.ValueInt >= candles.Count)
-            {
-                return;
-            }
-            if (SmaLengthFilter.ValueInt >= candles.Count)
+            if (LengthZZ.ValueInt >= candles.Count ||
+                LengthRSI.ValueInt >= candles.Count ||
+                SmaLengthFilter.ValueInt >= candles.Count)
             {
                 return;
             }
@@ -130,6 +143,7 @@ namespace OsEngine.Robots.Oleg.Good
                 bool currentCandleLowPeakCandidate = currentCandleLowPeakPrice > 0;
                 if (currentCandleHighPeakCandidate || currentCandleLowPeakCandidate)
                 {
+                    decimal lastRsiValue = _rsi.DataSeries[0].Last;
                     decimal slippage = Slippage.ValueDecimal * lastCandleClosePrice / 100;
 
                     // LONG
@@ -139,8 +153,11 @@ namespace OsEngine.Robots.Oleg.Good
                         if (lastCompletedLowPeakIndex != -1)
                         {
                             decimal lastCompletedLowPeakPrice = ZigZagLowPeaks.Values[lastCompletedLowPeakIndex];
-                            bool lowerLow = currentCandleLowPeakPrice < lastCompletedLowPeakPrice;
-                            if (lowerLow)
+                            bool priceGoesDown = currentCandleLowPeakPrice < lastCompletedLowPeakPrice;
+                            decimal lastCompletedLowPeakRsiValue = _rsi.DataSeries[0].Values[lastCompletedLowPeakIndex];
+                            bool rsiPowerGrows = lastRsiValue > lastCompletedLowPeakRsiValue;
+                            bool rsiConvergence = priceGoesDown && rsiPowerGrows;
+                            if (rsiConvergence)
                             {
                                 _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
                             }
@@ -154,8 +171,11 @@ namespace OsEngine.Robots.Oleg.Good
                         if (lastCompletedHighPeakIndex != -1)
                         {
                             decimal lastCompletedHighPeakPrice = ZigZagHighPeaks.Values[lastCompletedHighPeakIndex];
-                            bool higherHigh = currentCandleHighPeakPrice > lastCompletedHighPeakPrice;
-                            if (higherHigh)
+                            bool priceGoesUp = currentCandleHighPeakPrice > lastCompletedHighPeakPrice;
+                            decimal lastCompletedHighPeakRsiValue = _rsi.DataSeries[0].Values[lastCompletedHighPeakIndex];
+                            bool rsiPowerFalls = lastRsiValue < lastCompletedHighPeakRsiValue;
+                            bool rsiDivergence = priceGoesUp && rsiPowerFalls;
+                            if (rsiDivergence)
                             {
                                 _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
                             }
