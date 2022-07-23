@@ -28,6 +28,9 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterBool SmaPositionFilterIsOn;
         private StrategyParameterBool SmaSlopeFilterIsOn;
 
+        private IndicatorDataSeries ZigZagHighPeaks { get { return this._zz.DataSeries[2]; } }
+        private IndicatorDataSeries ZigZagLowPeaks { get { return this._zz.DataSeries[3]; } }
+
         public DivergenceContrTrend(string name, StartProgram startProgram) : base(name, startProgram)
         {
             TabCreate(BotTabType.Simple);
@@ -117,77 +120,118 @@ namespace OsEngine.Robots.Oleg.Good
                 return;
             }
 
-            decimal slippage = 0;
-            List<Position> positions = _tab.PositionsOpenAll;
-            decimal lastCandleClosePrice = candles[candles.Count - 1].Close;
-            decimal lastMaFilter = _smaFilter.DataSeries[0].Last;
-            decimal zzChannelUp = _zz.DataSeries[4].Last;
-            decimal zzChannelDown = _zz.DataSeries[5].Last;
-
-            // _zz.DataSeries[2].Last; - ZigZag Highs
-            // _zz.DataSeries[3].Last; - ZigZag Lows
-
-            if (zzChannelDown <= 0 || zzChannelUp <= 0)
+            decimal currentCandleHighPeakPrice = GetCurrentCandleHighPeakPrice();
+            decimal currentCandleLowPeakPrice = GetCurrentCandleLowPeakPrice();
+            bool currentCandleHighPeakCandidate = currentCandleHighPeakPrice > 0;
+            bool currentCandleLowPeakCandidate = currentCandleLowPeakPrice > 0;
+            if (!currentCandleHighPeakCandidate && !currentCandleLowPeakCandidate)
             {
                 return;
             }
 
-            if (positions.Count == 0)
+            decimal slippage = 0;
+            if (_tab.PositionsOpenAll.Count == 0)
             {
-                if (zzChannelDown > zzChannelUp)
-                {
-                    return;
-                }
+                decimal lastCandleClosePrice = candles[candles.Count - 1].Close;
+                slippage = Slippage.ValueDecimal * lastCandleClosePrice / 100;
 
                 // LONG
-                slippage = Slippage.ValueDecimal * zzChannelUp / 100;
-                if (!BuySignalIsFiltered(candles))
+                if (currentCandleHighPeakCandidate && !BuySignalIsFiltered(candles))
                 {
-                    bool alreadyOutOfChannel = lastCandleClosePrice > zzChannelUp + slippage;
-                    if (alreadyOutOfChannel)
+                    int lastCompletedHighPeakIndex = GetLastCompletedHighPeakIndex();
+                    if (lastCompletedHighPeakIndex != -1)
                     {
-                        return;
+                        decimal lastCompletedHighPeakPrice = ZigZagHighPeaks.Values[lastCompletedHighPeakIndex];
+                        bool higherHigh = currentCandleHighPeakPrice > lastCompletedHighPeakPrice;
+                        if (higherHigh)
+                        {
+                            _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
+                        }
                     }
-                    _tab.BuyAtStop(GetVolume(), zzChannelUp + slippage, zzChannelUp, StopActivateType.HigherOrEqual, 1);
                 }
 
                 // SHORT
-                slippage = Slippage.ValueDecimal * zzChannelDown / 100;
-                if (!SellSignalIsFiltered(candles))
+                if (currentCandleLowPeakCandidate && !SellSignalIsFiltered(candles))
                 {
-                    bool alreadyOutOfChannel = lastCandleClosePrice < zzChannelDown - slippage;
-                    if (alreadyOutOfChannel)
+                    int lastCompletedLowPeakIndex = GetLastCompletedLowPeakIndex();
+                    if (lastCompletedLowPeakIndex != -1)
                     {
-                        return;
+                        decimal lastCompletedLowPeakPrice = ZigZagLowPeaks.Values[lastCompletedLowPeakIndex];
+                        bool lowerLow = currentCandleLowPeakPrice < lastCompletedLowPeakPrice;
+                        if (lowerLow)
+                        {
+                            _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
+                        }
                     }
-                    _tab.SellAtStop(GetVolume(), zzChannelDown - slippage, zzChannelDown, StopActivateType.LowerOrEqyal, 1);
                 }
             }
             else
             {
-                for (int i = 0; i < positions.Count; i++)
+                foreach (Position position in _tab.PositionsOpenAll)
                 {
                     _tab.BuyAtStopCancel();
                     _tab.SellAtStopCancel();
 
-                    if (positions[i].State == PositionStateType.Open)
+                    if (position.State == PositionStateType.Open)
                     {
-                        decimal stopLevel = 0;
-                        if (positions[i].Direction == Side.Buy)
+                        decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
+                        slippage = Slippage.ValueDecimal * lastSmaPrice / 100;
+                        if (position.Direction == Side.Buy)
                         {
-                            stopLevel = zzChannelDown > lastMaFilter ? zzChannelDown : lastMaFilter;
-                            slippage = Slippage.ValueDecimal * stopLevel / 100;
-                            _tab.CloseAtTrailingStop(positions[i], stopLevel, stopLevel - slippage);
+                            _tab.CloseAtTrailingStop(position, lastSmaPrice, lastSmaPrice - slippage);
                         }
-                        else if (positions[i].Direction == Side.Sell)
+                        else if (position.Direction == Side.Sell)
                         {
-                            stopLevel = zzChannelUp < lastMaFilter && zzChannelUp > 0 ? zzChannelUp : lastMaFilter;
-                            slippage = Slippage.ValueDecimal * stopLevel / 100;
-                            _tab.CloseAtTrailingStop(positions[i], stopLevel, stopLevel + slippage);
+                            _tab.CloseAtTrailingStop(position, lastSmaPrice, lastSmaPrice + slippage);
                         }
                     }
                 }
             }
+        }
+
+        private decimal GetCurrentCandleHighPeakPrice()
+        {
+            return ZigZagHighPeaks.Last;
+        }
+
+        private decimal GetCurrentCandleLowPeakPrice()
+        {
+            return ZigZagLowPeaks.Last;
+        }
+
+        private int GetLastCompletedHighPeakIndex()
+        {
+            return GetSecondPositiveElementIndexFromTale(ZigZagHighPeaks.Values);
+        }
+
+        private int GetLastCompletedLowPeakIndex()
+        {
+            return GetSecondPositiveElementIndexFromTale(ZigZagLowPeaks.Values);
+        }
+
+        private int GetSecondPositiveElementIndexFromTale(List<decimal> elements)
+        {
+            int secondPositiveElementIndexFromTale = -1;
+            if (elements != null && elements.Count > 0)
+            {
+                bool firstPositiveElementIndexFromTheTaleFound = false;
+                for (int i = elements.Count - 1; i >= 0; i--)
+                {
+                    if (elements[i] > 0)
+                    {
+                        if (firstPositiveElementIndexFromTheTaleFound)
+                        {
+                            secondPositiveElementIndexFromTale = i;
+                            break;
+                        }
+                        else
+                        {
+                            firstPositiveElementIndexFromTheTaleFound = true;
+                        }
+                    }
+                }
+            }
+            return secondPositiveElementIndexFromTale;
         }
 
         private void CancelStopsAndProfits()
@@ -205,8 +249,8 @@ namespace OsEngine.Robots.Oleg.Good
 
         private bool BuySignalIsFiltered(List<Candle> candles)
         {
-            decimal lastSma = _smaFilter.DataSeries[0].Last;
-            decimal lastPrice = candles[candles.Count - 1].Close;
+            decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
+            decimal lastCandleClosePrice = candles[candles.Count - 1].Close;
 
             if (Regime.ValueString == "Off" ||
                 Regime.ValueString == "OnlyShort" ||
@@ -217,7 +261,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (SmaPositionFilterIsOn.ValueBool)
             {
-                if (lastSma > lastPrice)
+                if (lastCandleClosePrice < lastSmaPrice)
                 {
                     return true;
                 }
@@ -225,8 +269,8 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (SmaSlopeFilterIsOn.ValueBool)
             {
-                decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
-                if (lastSma < prevSma)
+                decimal prevSmaPrice = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
+                if (lastSmaPrice < prevSmaPrice)
                 {
                     return true;
                 }
@@ -237,8 +281,8 @@ namespace OsEngine.Robots.Oleg.Good
 
         private bool SellSignalIsFiltered(List<Candle> candles)
         {
-            decimal lastSma = _smaFilter.DataSeries[0].Last;
-            decimal lastPrice = candles[candles.Count - 1].Close;
+            decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
+            decimal lastCandleClosePrice = candles[candles.Count - 1].Close;
 
             if (Regime.ValueString == "Off" ||
                 Regime.ValueString == "OnlyLong" ||
@@ -249,7 +293,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (SmaPositionFilterIsOn.ValueBool)
             {
-                if (lastSma < lastPrice)
+                if (lastCandleClosePrice > lastSmaPrice)
                 {
                     return true;
                 }
@@ -257,8 +301,8 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (SmaSlopeFilterIsOn.ValueBool)
             {
-                decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
-                if (lastSma > prevSma)
+                decimal prevSmaPrice = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
+                if (lastSmaPrice > prevSmaPrice)
                 {
                     return true;
                 }
