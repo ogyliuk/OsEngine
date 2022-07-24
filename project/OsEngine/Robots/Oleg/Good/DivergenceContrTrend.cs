@@ -24,6 +24,7 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterInt LengthATR;
         private StrategyParameterInt LengthBollinger;
         private StrategyParameterDecimal DeviationBollinger;
+        private StrategyParameterDecimal AnglePercentRSI;
         private StrategyParameterString Regime;
         private StrategyParameterDecimal Slippage;
         private StrategyParameterTimeOfDay TimeStart;
@@ -57,6 +58,7 @@ namespace OsEngine.Robots.Oleg.Good
             LengthATR = CreateParameter("Length ATR", 14, 10, 50, 2, "Robot parameters");
             LengthBollinger = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             DeviationBollinger = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
+            AnglePercentRSI = CreateParameter("Angle percent RSI", 2m, 1m, 15m, 1m, "Robot parameters");
 
             SmaLengthFilter = CreateParameter("Sma Length", 100, 10, 500, 1, "Filters");
             SmaPositionFilterIsOn = CreateParameter("Is SMA Filter On", false, "Filters");
@@ -91,7 +93,7 @@ namespace OsEngine.Robots.Oleg.Good
             _atr.Save();
 
             _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
-            // _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
+            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
             ParametrsChangeByUser += DivergenceContrTrend_ParametrsChangeByUserEventHandler;
             DivergenceContrTrend_ParametrsChangeByUserEventHandler();
         }
@@ -193,10 +195,15 @@ namespace OsEngine.Robots.Oleg.Good
                             bool priceGoesDown = currentCandleLowPeakPrice < lastCompletedLowPeakPrice;
                             decimal lastCompletedLowPeakRsiValue = _rsi.DataSeries[0].Values[lastCompletedLowPeakIndex];
                             bool rsiPowerGrows = lastRsiValue > lastCompletedLowPeakRsiValue;
-                            bool rsiConvergence = priceGoesDown && rsiPowerGrows;
-                            if (rsiConvergence)
+                            if (rsiPowerGrows)
                             {
-                                _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
+                                decimal rsiPowerGrowingAnglePercent = lastRsiValue * 100 / lastCompletedLowPeakRsiValue - 100;
+                                bool rsiPowerGrowsEnough = rsiPowerGrowingAnglePercent >= AnglePercentRSI.ValueDecimal;
+                                bool rsiConvergence = priceGoesDown && rsiPowerGrowsEnough;
+                                if (rsiConvergence)
+                                {
+                                    _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
+                                }
                             }
                         }
                     }
@@ -211,10 +218,15 @@ namespace OsEngine.Robots.Oleg.Good
                             bool priceGoesUp = currentCandleHighPeakPrice > lastCompletedHighPeakPrice;
                             decimal lastCompletedHighPeakRsiValue = _rsi.DataSeries[0].Values[lastCompletedHighPeakIndex];
                             bool rsiPowerFalls = lastRsiValue < lastCompletedHighPeakRsiValue;
-                            bool rsiDivergence = priceGoesUp && rsiPowerFalls;
-                            if (rsiDivergence)
+                            if (rsiPowerFalls)
                             {
-                                _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
+                                decimal rsiPowerFallingAnglePercent = 100 - lastRsiValue * 100 / lastCompletedHighPeakRsiValue;
+                                bool rsiPowerFallsEnough = rsiPowerFallingAnglePercent >= AnglePercentRSI.ValueDecimal;
+                                bool rsiDivergence = priceGoesUp && rsiPowerFallsEnough;
+                                if (rsiDivergence)
+                                {
+                                    _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
+                                }
                             }
                         }
                     }
