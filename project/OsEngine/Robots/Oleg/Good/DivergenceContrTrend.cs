@@ -16,10 +16,12 @@ namespace OsEngine.Robots.Oleg.Good
         private Aindicator _zz;
         private Aindicator _bollinger;
         private Aindicator _rsi;
+        private Aindicator _atr;
         private Aindicator _smaFilter;
 
         private StrategyParameterInt LengthZZ;
         private StrategyParameterInt LengthRSI;
+        private StrategyParameterInt LengthATR;
         private StrategyParameterInt LengthBollinger;
         private StrategyParameterDecimal DeviationBollinger;
         private StrategyParameterString Regime;
@@ -52,6 +54,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             LengthZZ = CreateParameter("Length ZZ", 15, 5, 200, 5, "Robot parameters");
             LengthRSI = CreateParameter("Length RSI", 14, 10, 50, 2, "Robot parameters");
+            LengthATR = CreateParameter("Length ATR", 14, 10, 50, 2, "Robot parameters");
             LengthBollinger = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             DeviationBollinger = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
 
@@ -80,6 +83,12 @@ namespace OsEngine.Robots.Oleg.Good
             _rsi = (Aindicator)_tab.CreateCandleIndicator(_rsi, nameArea: "RsiArea");
             _rsi.ParametersDigit[0].Value = LengthRSI.ValueInt;
             _rsi.Save();
+
+            _atr = IndicatorsFactory.CreateIndicatorByName(nameClass: "ATR", name: name + "ATR", canDelete: false);
+            _atr = (Aindicator)_tab.CreateCandleIndicator(_atr, nameArea: "AtrArea");
+            _atr.DataSeries[0].Color = System.Drawing.Color.Red;
+            _atr.ParametersDigit[0].Value = LengthATR.ValueInt;
+            _atr.Save();
 
             _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
             // _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
@@ -110,6 +119,13 @@ namespace OsEngine.Robots.Oleg.Good
                 _rsi.ParametersDigit[0].Value = LengthRSI.ValueInt;
                 _rsi.Reload();
                 _rsi.Save();
+            }
+
+            if (_atr.ParametersDigit[0].Value != LengthATR.ValueInt)
+            {
+                _atr.ParametersDigit[0].Value = LengthATR.ValueInt;
+                _atr.Reload();
+                _atr.Save();
             }
 
             if (_smaFilter.ParametersDigit[0].Value != SmaLengthFilter.ValueInt)
@@ -230,27 +246,19 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void _tab_PositionOpenEventHandler(Position position)
         {
-            decimal STOP_LOSS_SIZE_IN_PERCENTS = 1m;
             if (position != null && position.State == PositionStateType.Open)
             {
                 // Generic parameters
                 bool longDeal = position.Direction == Side.Buy;
-                decimal lastSmaPrice = _smaFilter.DataSeries[0].Last;
                 decimal slippage = position.EntryPrice * Slippage.ValueDecimal / 100;
+                decimal atrValue = _atr.DataSeries[0].Last;
 
                 // STOP LOSS
-                decimal SL_TriggerPrice = longDeal ? 
-                    position.EntryPrice * (100 - STOP_LOSS_SIZE_IN_PERCENTS) / 100 : 
-                    position.EntryPrice * (100 + STOP_LOSS_SIZE_IN_PERCENTS) / 100;
+                decimal SL_TriggerPrice = longDeal ? position.EntryPrice - atrValue : position.EntryPrice + atrValue;
                 decimal SL_Price = longDeal ? SL_TriggerPrice - slippage : SL_TriggerPrice + slippage;
-
-                // TAKE PROFIT
-                decimal TP_TriggerPrice = lastSmaPrice;
-                decimal TP_Price = longDeal ? TP_TriggerPrice - slippage : TP_TriggerPrice + slippage;
 
                 // Orders
                 _tab.CloseAtStop(position, SL_TriggerPrice, SL_Price);
-                _tab.CloseAtProfit(position, TP_TriggerPrice, TP_Price);
             }
         }
 
