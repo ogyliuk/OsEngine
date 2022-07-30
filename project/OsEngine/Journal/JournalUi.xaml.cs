@@ -716,9 +716,9 @@ namespace OsEngine.Journal
                 CreateTableToStatistic();
             }
 
-            List<string> positionsAllState = PositionStaticticGenerator.GetStatisticNew(positionsAll, neadShowTickState);
-            List<string> positionsLongState = PositionStaticticGenerator.GetStatisticNew(positionsLong, neadShowTickState);
-            List<string> positionsShortState = PositionStaticticGenerator.GetStatisticNew(positionsShort, neadShowTickState);
+            List<string> positionsAllState = PositionStaticticGenerator.GetStatisticNew(positionsAll);
+            List<string> positionsLongState = PositionStaticticGenerator.GetStatisticNew(positionsLong);
+            List<string> positionsShortState = PositionStaticticGenerator.GetStatisticNew(positionsShort);
 
             if (positionsAllState == null)
             {
@@ -2263,43 +2263,6 @@ namespace OsEngine.Journal
         /// исходящее сообщение для лога
         /// </summary>
         public event Action<string, LogMessageType> LogMessageEvent;
-    }
-
-    /// <summary>
-    /// log storage class
-    /// класс хранилище журналов
-    /// </summary>
-    public class BotPanelJournal
-    {
-        public string BotName;
-
-        public List<BotTabJournal> _Tabs;
-
-        public List<Position> AllPositions
-        {
-            get
-            {
-                List<Position> poses = new List<Position>();
-
-                for(int i = 0;i < _Tabs.Count;i++)
-                {
-                    poses.AddRange(_Tabs[i].Journal.AllPosition);
-                }
-
-                return poses;
-            }
-        }
-    }
-
-    /// <summary>
-    /// log storage class
-    /// класс хранилище журналов
-    /// </summary>
-    public class BotTabJournal
-    {
-        public int TabNum;
-
-        public Journal Journal;
     }
 
     /// <summary>
