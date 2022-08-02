@@ -92,12 +92,11 @@ namespace OsEngine.Robots.Oleg.Good
                 return;
             }
 
-            decimal lastCandleClosePrice = _tab.CandlesAll.Last().Close;
             if (_tab.PositionsOpenAll.Count == 0)
             {
-                if (lastCandleClosePrice > _bollinger.DataSeries[0].Last)
+                if (trade.Price > _bollinger.DataSeries[0].Last)
                 {
-                    _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, lastCandleClosePrice);
+                    _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, trade.Price);
                 }
 
                 // _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
