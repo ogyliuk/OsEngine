@@ -64,11 +64,18 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 if (candle.IsUp)
                 {
+                    // EACH entry - new position
                     if (HasPosition_LONG())
                     {
-                        // EACH entry - new position
-                        // if in MIN profit - close
-                        // if in loss - averaging or take loss
+                        // 1 entry and has PROFIT - close by market
+                        // in small proifit - do nothing
+                        // in small loss - do nothing
+
+                        // in enough loss - take loss or
+                        // [
+                        //    averaging (volume - sum of two prev) + put TP for this new AVG pos + move TP to easier place (calc it by all poses) for all poses exept of the first
+                        // ]
+
                     }
                     else
                     {
@@ -79,7 +86,6 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     if (HasPosition_SHORT())
                     {
-                        // EACH entry - new position
                         // if in MIN profit - close
                         // if in loss - averaging or take loss
                     }
