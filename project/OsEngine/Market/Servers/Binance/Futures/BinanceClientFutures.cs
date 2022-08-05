@@ -1063,6 +1063,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     param.Add("&quantity=",
                         order.Volume.ToString(CultureInfo.InvariantCulture)
                             .Replace(CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator, "."));
+                    param.Add("&recvWindow=", "50000");
 
                     if (!HedgeMode && order.PositionConditionType == OrderPositionConditionType.Close)
                     {
@@ -1190,6 +1191,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
                     param.Add("symbol=", order.SecurityNameCode.ToUpper());
                     param.Add("&orderId=", order.NumberMarket);
+                    param.Add("&recvWindow=", "50000");
 
                     CreateQuery(Method.DELETE, "/" + type_str_selector + "/v1/order", param, true);
 
@@ -1226,7 +1228,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 var param = new Dictionary<string, string>();
                 param.Add("symbol=", namesSec[i].ToUpper());
-                //param.Add("&recvWindow=" , "100");
+                param.Add("&recvWindow=", "50000");
                 //param.Add("&limit=", GetNonce());
                 param.Add("&limit=", "500");
                 //"symbol={symbol.ToUpper()}&recvWindow={recvWindow}"
@@ -1362,7 +1364,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 var param = new Dictionary<string, string>();
                 param.Add("symbol=", namesSec[i].ToUpper());
-                //param.Add("&recvWindow=" , "100");
+                param.Add("&recvWindow=" , "50000");
                 //param.Add("&limit=", GetNonce());
                 param.Add("&limit=", "500");
                 //"symbol={symbol.ToUpper()}&recvWindow={recvWindow}"
