@@ -47,14 +47,14 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void _tab_CandleFinishedEventHandler(List<Candle> candles)
         {
+            const decimal FEE_PERCENTS = 0.04m;
+            const decimal MIN_PROFIT_PERCENTS = 0.2m;
+            const decimal AVERAGING_THRESHOLD_PERCENTS = 0.5m;
+
             if (Regime.ValueString == "Off" || _tab.CandlesAll == null || _tab.CandlesAll.Count < 2)
             {
                 return;
             }
-
-            // смена цвета - открываем позу, получили зеленую - открываем лонг, красную - шорт
-            // если позиция в плюсе на момент смены цвета - закрываем по рынку,
-            // если в минусе - усредняемся на постоянную величину или закрываем в убыток
 
             Candle candle = candles.Last();
             Candle previousCandle = candles[candles.Count - 2];
@@ -62,32 +62,69 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (candleColorSwitched)
             {
+                List<Position> positionsLong = GetPositions_LONG();
+                List<Position> positionsShort = GetPositions_SHORT();
+
                 if (candle.IsUp)
                 {
-                    // EACH entry - new position
-                    if (HasPosition_LONG())
+                    if (positionsShort.Count == 1)
                     {
-                        // 1 entry and has PROFIT - close by market
-                        // in small proifit - do nothing
-                        // in small loss - do nothing
+                        Position position = positionsShort.First();
+                        decimal volume = position.OpenVolume;
+                        decimal entryPrice = position.EntryPrice;
+                        decimal revenue = CalcPositionRevenue_SHORT(volume, entryPrice, candle.Close, FEE_PERCENTS);
+                        if (revenue > 0)
+                        {
+                            decimal minTakeProfitPrice = entryPrice * (100 - MIN_PROFIT_PERCENTS) / 100;
+                            decimal neededRevenue = CalcPositionRevenue_SHORT(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
+                            if (revenue >= neededRevenue)
+                            {
+                                _tab.CloseAtMarket(position, volume);
+                            }
+                        }
+                    }
 
-                        // in enough loss - take loss or
+                    if (positionsLong.Any())
+                    {
+                        // If best BUY pos in enough loss
                         // [
-                        //    averaging (volume - sum of two prev) + put TP for this new AVG pos + move TP to easier place (calc it by all poses) for all poses exept of the first
+                        //    averaging (volume - sum of two prev BUY poses)
+                        //    +
+                        //    set TP for all BUY poses except of the first one to the price of ZERO LOSS + WANTED PROFIT
                         // ]
-
                     }
                     else
                     {
                         _tab.BuyAtMarket(GetVolume());
                     }
                 }
-                else
+                else if (candle.IsDown)
                 {
-                    if (HasPosition_SHORT())
+                    if (positionsLong.Count == 1)
                     {
-                        // if in MIN profit - close
-                        // if in loss - averaging or take loss
+                        Position position = positionsLong.First();
+                        decimal volume = position.OpenVolume;
+                        decimal entryPrice = position.EntryPrice;
+                        decimal revenue = CalcPositionRevenue_LONG(volume, entryPrice, candle.Close, FEE_PERCENTS);
+                        if (revenue > 0)
+                        {
+                            decimal minTakeProfitPrice = entryPrice * (100 + MIN_PROFIT_PERCENTS) / 100;
+                            decimal neededRevenue = CalcPositionRevenue_LONG(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
+                            if (revenue >= neededRevenue)
+                            {
+                                _tab.CloseAtMarket(position, volume);
+                            }
+                        }
+                    }
+
+                    if (positionsShort.Any())
+                    {
+                        // If best SELL pos in enough loss
+                        // [
+                        //    averaging (volume - sum of two prev SELL poses)
+                        //    +
+                        //    set TP for all SELL poses except of the first one to the price of ZERO LOSS + WANTED PROFIT
+                        // ]
                     }
                     else
                     {
@@ -95,35 +132,24 @@ namespace OsEngine.Robots.Oleg.Good
                     }
                 }
             }
-
-            decimal lastCandleClosePrice = candles.Last().Close;
-            if (_tab.PositionsOpenAll.Count == 0)
-            {
-                // LONG
-                _tab.BuyAtStop(GetVolume(), lastCandleClosePrice, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
-                // SHORT
-                _tab.SellAtStop(GetVolume(), lastCandleClosePrice, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
-            }
-            else
-            {
-                foreach (Position position in _tab.PositionsOpenAll)
-                {
-                    if (position.State == PositionStateType.Open)
-                    {
-                        // _tab.CloseAtLimit(position, closePrice, position.OpenVolume);
-                    }
-                }
-            }
         }
 
-        private bool HasPosition_LONG()
+        private List<Position> GetPositions_LONG()
         {
-            return _tab.PositionsOpenAll != null &&  _tab.PositionsOpenAll.Any(p => p.Direction == Side.Buy);
+            if (_tab.PositionsOpenAll != null)
+            {
+                return _tab.PositionsOpenAll.Where(p => p.Direction == Side.Buy && p.State == PositionStateType.Open).ToList();
+            }
+            return new List<Position>();
         }
 
-        private bool HasPosition_SHORT()
+        private List<Position> GetPositions_SHORT()
         {
-            return _tab.PositionsOpenAll != null && _tab.PositionsOpenAll.Any(p => p.Direction == Side.Sell);
+            if (_tab.PositionsOpenAll != null)
+            {
+                return _tab.PositionsOpenAll.Where(p => p.Direction == Side.Sell && p.State == PositionStateType.Open).ToList();
+            }
+            return new List<Position>();
         }
 
         private void _tab_PositionOpenEventHandler(Position position)
@@ -137,22 +163,62 @@ namespace OsEngine.Robots.Oleg.Good
 
         private decimal GetVolume()
         {
-            decimal volume = VolumeFirstEntry.ValueDecimal;
+            return 1;
+            //decimal volume = VolumeFirstEntry.ValueDecimal;
 
-            if (VolumeMode.ValueString == "Contract currency") // "Валюта контракта"
-            {
-                decimal contractPrice = TabsSimple[0].PriceBestAsk;
-                volume = Math.Round(VolumeFirstEntry.ValueDecimal / contractPrice, VolumeDecimals.ValueInt);
-                return volume;
-            }
-            else if (VolumeMode.ValueString == "Number of contracts")
-            {
-                return volume;
-            }
-            else //if (VolumeRegime.ValueString == "% of the total portfolio")
-            {
-                return Math.Round(_tab.Portfolio.ValueCurrent * (volume / 100) / _tab.PriceBestAsk / _tab.Securiti.Lot, VolumeDecimals.ValueInt);
-            }
+            //if (VolumeMode.ValueString == "Contract currency") // "Валюта контракта"
+            //{
+            //    decimal contractPrice = TabsSimple[0].PriceBestAsk;
+            //    volume = Math.Round(VolumeFirstEntry.ValueDecimal / contractPrice, VolumeDecimals.ValueInt);
+            //    return volume;
+            //}
+            //else if (VolumeMode.ValueString == "Number of contracts")
+            //{
+            //    return volume;
+            //}
+            //else //if (VolumeRegime.ValueString == "% of the total portfolio")
+            //{
+            //    return Math.Round(_tab.Portfolio.ValueCurrent * (volume / 100) / _tab.PriceBestAsk / _tab.Securiti.Lot, VolumeDecimals.ValueInt);
+            //}
+        }
+
+        public decimal CalcPositionRevenue_LONG(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents)
+        {
+            decimal fee;
+            return CalcPositionRevenue_LONG(quantity, priceEntry, priceClose, feeInPercents, out fee);
+        }
+
+        public decimal CalcPositionRevenue_SHORT(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents)
+        {
+            decimal fee;
+            return CalcPositionRevenue_SHORT(quantity, priceEntry, priceClose, feeInPercents, out fee);
+        }
+
+        public decimal CalcPositionRevenue_LONG(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents, out decimal fee)
+        {
+            decimal feeMoneySpent;
+            decimal feeMoneyGot;
+            decimal moneySpent = CalcTradeMoney(quantity, priceEntry, feeInPercents, Side.Buy, out feeMoneySpent);
+            decimal moneyGot = CalcTradeMoney(quantity, priceClose, feeInPercents, Side.Sell, out feeMoneyGot);
+            fee = feeMoneySpent + feeMoneyGot;
+            return moneyGot - moneySpent;
+        }
+
+        public decimal CalcPositionRevenue_SHORT(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents, out decimal fee)
+        {
+            decimal feeMoneyGot;
+            decimal feeMoneySpent;
+            decimal moneyGot = CalcTradeMoney(quantity, priceEntry, feeInPercents, Side.Sell, out feeMoneyGot);
+            decimal moneySpent = CalcTradeMoney(quantity, priceClose, feeInPercents, Side.Buy, out feeMoneySpent);
+            fee = feeMoneyGot + feeMoneySpent;
+            return moneyGot - moneySpent;
+        }
+
+        protected decimal CalcTradeMoney(decimal quantity, decimal price, decimal feeInPercents, Side side, out decimal fee)
+        {
+            decimal moneyNoFee = quantity * price;
+            fee = moneyNoFee / 100 * feeInPercents;
+            return side == Side.Buy ? moneyNoFee + fee : moneyNoFee - fee;
         }
     }
 }
