@@ -48,8 +48,8 @@ namespace OsEngine.Robots.Oleg.Good
         private void _tab_CandleFinishedEventHandler(List<Candle> candles)
         {
             const decimal FEE_PERCENTS = 0.04m;
-            const decimal MIN_PROFIT_PERCENTS = 0.2m;
-            const decimal AVERAGING_THRESHOLD_PERCENTS = 0.5m;
+            const decimal MIN_PROFIT_PERCENTS = 0.08m;
+            const decimal AVERAGING_THRESHOLD_PERCENTS = 0.08m;
 
             if (Regime.ValueString == "Off" || _tab.CandlesAll == null || _tab.CandlesAll.Count < 2)
             {
@@ -79,6 +79,7 @@ namespace OsEngine.Robots.Oleg.Good
                             decimal neededRevenue = CalcPositionRevenue_SHORT(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
                             if (revenue >= neededRevenue)
                             {
+                                Console.WriteLine("Closing SHORT");
                                 _tab.CloseAtMarket(position, volume);
                             }
                         }
@@ -95,6 +96,7 @@ namespace OsEngine.Robots.Oleg.Good
                     }
                     else
                     {
+                        Console.WriteLine("Opening LONG");
                         _tab.BuyAtMarket(GetVolume());
                     }
                 }
@@ -112,6 +114,7 @@ namespace OsEngine.Robots.Oleg.Good
                             decimal neededRevenue = CalcPositionRevenue_LONG(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
                             if (revenue >= neededRevenue)
                             {
+                                Console.WriteLine("Closing LONG");
                                 _tab.CloseAtMarket(position, volume);
                             }
                         }
@@ -128,6 +131,7 @@ namespace OsEngine.Robots.Oleg.Good
                     }
                     else
                     {
+                        Console.WriteLine("Opening SHORT");
                         _tab.SellAtMarket(GetVolume());
                     }
                 }
