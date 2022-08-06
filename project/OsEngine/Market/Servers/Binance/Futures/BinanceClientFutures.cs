@@ -891,7 +891,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
             }
             catch (Exception ex)
             {
-                return HandleHttpRequestException(ex);
+                string callInfo = String.Format("{0}_{1}", method, endpoint);
+                return HandleHttpRequestException(callInfo, ex);
             }
         }
 
@@ -911,7 +912,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
             }
             catch (Exception ex)
             {
-                return HandleHttpRequestException(ex);
+                string callInfo = String.Format("{0}_{1}", method, endpoint);
+                return HandleHttpRequestException(callInfo, ex);
             }
         }
 
@@ -968,7 +970,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             return response;
         }
 
-        private string HandleHttpRequestException(Exception ex)
+        private string HandleHttpRequestException(string callInfo, Exception ex)
         {
             if (ex.ToString().Contains("This listenKey does not exist"))
             {
@@ -981,7 +983,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 return null;
             }
 
-            SendLogMessage(ex.ToString(), LogMessageType.Error);
+            SendLogMessage(callInfo + " " + ex.ToString(), LogMessageType.Error);
             return null;
         }
 
