@@ -1019,7 +1019,7 @@ namespace OsEngine.Journal.Internal
 
                 try
                 {
-                    while (_positionsToPaint.Count != 0)
+                    while (_positionsToPaint != null && _positionsToPaint.Count != 0)
                     {
                         Position newElement = _positionsToPaint[0];
 
@@ -1027,7 +1027,10 @@ namespace OsEngine.Journal.Internal
                         {
                             PaintPosition(newElement);
                         }
-                        _positionsToPaint.RemoveAt(0);
+                        if (_positionsToPaint != null)
+                        {
+                            _positionsToPaint.RemoveAt(0);
+                        }
                     }
                 }
                 catch
