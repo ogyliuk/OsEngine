@@ -11,6 +11,10 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("Averaging")]
     public class Averaging : BotPanel
     {
+        private static readonly decimal FEE_PERCENTS = 0.04m;
+        private static readonly decimal MIN_PROFIT_PERCENTS = 0.08m;
+        private static readonly decimal AVERAGING_THRESHOLD_PERCENTS = 0.08m;
+
         private BotTabSimple _tab;
 
         private StrategyParameterString Regime;
@@ -47,10 +51,6 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void _tab_CandleFinishedEventHandler(List<Candle> candles)
         {
-            const decimal FEE_PERCENTS = 0.04m;
-            const decimal MIN_PROFIT_PERCENTS = 0.08m;
-            const decimal AVERAGING_THRESHOLD_PERCENTS = 0.08m;
-
             if (Regime.ValueString == "Off" || _tab.CandlesAll == null || _tab.CandlesAll.Count < 2)
             {
                 return;
@@ -59,6 +59,8 @@ namespace OsEngine.Robots.Oleg.Good
             Candle candle = candles.Last();
             Candle previousCandle = candles[candles.Count - 2];
             bool candleColorSwitched = candle.IsUp != previousCandle.IsUp;
+            bool longTradingEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyLong";
+            bool shortTradingEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyShort";
 
             if (candleColorSwitched)
             {
@@ -67,76 +69,94 @@ namespace OsEngine.Robots.Oleg.Good
 
                 if (candle.IsUp)
                 {
-                    if (positionsShort.Count == 1)
+                    if (shortTradingEnabled && positionsShort.Count == 1)
                     {
                         Position position = positionsShort.First();
                         decimal volume = position.OpenVolume;
                         decimal entryPrice = position.EntryPrice;
-                        decimal revenue = CalcPositionRevenue_SHORT(volume, entryPrice, candle.Close, FEE_PERCENTS);
-                        if (revenue > 0)
+                        decimal profit = CalcPositionRevenue_SHORT(volume, entryPrice, candle.Close, FEE_PERCENTS);
+                        if (profit > 0)
                         {
                             decimal moneyIn = CalcTradeMoney(volume, entryPrice, FEE_PERCENTS, Side.Sell);
                             decimal wantedProfit = moneyIn * (100 + MIN_PROFIT_PERCENTS) / 100 - moneyIn;
                             decimal minTakeProfitPrice = CalcPrice_SHORT_TP_TakeWantedProfit(volume, entryPrice, wantedProfit, FEE_PERCENTS);
-                            decimal neededRevenue = CalcPositionRevenue_SHORT(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
-                            if (revenue >= neededRevenue)
+                            decimal neededProfit = CalcPositionRevenue_SHORT(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
+                            if (profit >= neededProfit)
                             {
-                                Console.WriteLine("Closing SHORT");
                                 _tab.CloseAtMarket(position, volume);
                             }
                         }
                     }
 
-                    if (positionsLong.Any())
+                    if (longTradingEnabled)
                     {
-                        // If best BUY pos in enough loss
-                        // [
-                        //    averaging (volume - sum of two prev BUY poses)
-                        //    +
-                        //    set TP for all BUY poses except of the first one to the price of ZERO LOSS + WANTED PROFIT
-                        // ]
-                    }
-                    else
-                    {
-                        Console.WriteLine("Opening LONG");
-                        _tab.BuyAtMarket(GetVolume());
+                        if (positionsLong.Any())
+                        {
+                            Position lastPosition = positionsLong.Last();
+                            decimal currentLoss = CalcPositionRevenue_LONG(lastPosition.OpenVolume, lastPosition.EntryPrice, candle.Close, FEE_PERCENTS);
+                            if (currentLoss < 0)
+                            {
+                                decimal moneyIn = CalcTradeMoney(lastPosition.OpenVolume, lastPosition.EntryPrice, FEE_PERCENTS, Side.Buy);
+                                decimal maxAllowedLoss = -(moneyIn * (100 + AVERAGING_THRESHOLD_PERCENTS) / 100 - moneyIn);
+                                if (Math.Abs(currentLoss) > Math.Abs(maxAllowedLoss))
+                                {
+                                    decimal newAveragingPositionVolume = positionsLong.Count == 1 ?
+                                        lastPosition.OpenVolume * 2 :
+                                        lastPosition.OpenVolume + positionsLong[positionsLong.Count - 2].OpenVolume;
+                                    _tab.BuyAtMarket(newAveragingPositionVolume);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _tab.BuyAtMarket(GetVolume());
+                        }
                     }
                 }
                 else if (candle.IsDown)
                 {
-                    if (positionsLong.Count == 1)
+                    if (longTradingEnabled && positionsLong.Count == 1)
                     {
                         Position position = positionsLong.First();
                         decimal volume = position.OpenVolume;
                         decimal entryPrice = position.EntryPrice;
-                        decimal revenue = CalcPositionRevenue_LONG(volume, entryPrice, candle.Close, FEE_PERCENTS);
-                        if (revenue > 0)
+                        decimal profit = CalcPositionRevenue_LONG(volume, entryPrice, candle.Close, FEE_PERCENTS);
+                        if (profit > 0)
                         {
                             decimal moneyIn = CalcTradeMoney(volume, entryPrice, FEE_PERCENTS, Side.Buy);
                             decimal wantedProfit = moneyIn * (100 + MIN_PROFIT_PERCENTS) / 100 - moneyIn;
                             decimal minTakeProfitPrice = CalcPrice_LONG_TP_TakeWantedProfit(volume, entryPrice, wantedProfit, FEE_PERCENTS);
-                            decimal neededRevenue = CalcPositionRevenue_LONG(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
-                            if (revenue >= neededRevenue)
+                            decimal neededProfit = CalcPositionRevenue_LONG(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
+                            if (profit >= neededProfit)
                             {
-                                Console.WriteLine("Closing LONG");
                                 _tab.CloseAtMarket(position, volume);
                             }
                         }
                     }
 
-                    if (positionsShort.Any())
+                    if (shortTradingEnabled)
                     {
-                        // If best SELL pos in enough loss
-                        // [
-                        //    averaging (volume - sum of two prev SELL poses)
-                        //    +
-                        //    set TP for all SELL poses except of the first one to the price of ZERO LOSS + WANTED PROFIT
-                        // ]
-                    }
-                    else
-                    {
-                        Console.WriteLine("Opening SHORT");
-                        _tab.SellAtMarket(GetVolume());
+                        if (positionsShort.Any())
+                        {
+                            Position lastPosition = positionsShort.Last();
+                            decimal currentLoss = CalcPositionRevenue_SHORT(lastPosition.OpenVolume, lastPosition.EntryPrice, candle.Close, FEE_PERCENTS);
+                            if (currentLoss < 0)
+                            {
+                                decimal moneyIn = CalcTradeMoney(lastPosition.OpenVolume, lastPosition.EntryPrice, FEE_PERCENTS, Side.Sell);
+                                decimal maxAllowedLoss = -(moneyIn * (100 + AVERAGING_THRESHOLD_PERCENTS) / 100 - moneyIn);
+                                if (Math.Abs(currentLoss) > Math.Abs(maxAllowedLoss))
+                                {
+                                    decimal newAveragingPositionVolume = positionsShort.Count == 1 ?
+                                        lastPosition.OpenVolume * 2 :
+                                        lastPosition.OpenVolume + positionsShort[positionsShort.Count - 2].OpenVolume;
+                                    _tab.SellAtMarket(newAveragingPositionVolume);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _tab.SellAtMarket(GetVolume());
+                        }
                     }
                 }
             }
@@ -146,7 +166,7 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (_tab.PositionsOpenAll != null)
             {
-                return _tab.PositionsOpenAll.Where(p => p.Direction == Side.Buy && p.State == PositionStateType.Open).ToList();
+                return _tab.PositionsOpenAll.Where(p => p.Direction == Side.Buy && p.State == PositionStateType.Open).OrderBy(p => p.Number).ToList();
             }
             return new List<Position>();
         }
@@ -155,7 +175,7 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (_tab.PositionsOpenAll != null)
             {
-                return _tab.PositionsOpenAll.Where(p => p.Direction == Side.Sell && p.State == PositionStateType.Open).ToList();
+                return _tab.PositionsOpenAll.Where(p => p.Direction == Side.Sell && p.State == PositionStateType.Open).OrderBy(p => p.Number).ToList();
             }
             return new List<Position>();
         }
@@ -164,8 +184,16 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (position != null && position.State == PositionStateType.Open)
             {
-                // _tab.CloseAtLimit(position, takeProfitPrice, position.OpenVolume);
-                // _tab.CloseAtStop(position, stopLossPrice, stopLossPrice);
+                List<Position> positions = position.Direction == Side.Buy ? GetPositions_LONG() : GetPositions_SHORT();
+                if (positions.Count > 1)
+                {
+                    int firstPositionNumber = positions.First().Number;
+                    List<Position> positionsToAverage = positions.Where(p => p.Number > firstPositionNumber).ToList();
+
+
+                    // _tab.CloseAtLimit(position, takeProfitPrice, position.OpenVolume);
+                    // _tab.CloseAtStop(position, stopLossPrice, stopLossPrice);
+                }
             }
         }
 
