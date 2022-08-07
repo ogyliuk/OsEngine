@@ -75,7 +75,9 @@ namespace OsEngine.Robots.Oleg.Good
                         decimal revenue = CalcPositionRevenue_SHORT(volume, entryPrice, candle.Close, FEE_PERCENTS);
                         if (revenue > 0)
                         {
-                            decimal minTakeProfitPrice = entryPrice * (100 - MIN_PROFIT_PERCENTS) / 100;
+                            decimal moneyIn = CalcTradeMoney(volume, entryPrice, FEE_PERCENTS, Side.Sell);
+                            decimal wantedProfit = moneyIn * (100 + MIN_PROFIT_PERCENTS) / 100 - moneyIn;
+                            decimal minTakeProfitPrice = CalcPrice_SHORT_TP_TakeWantedProfit(volume, entryPrice, wantedProfit, FEE_PERCENTS);
                             decimal neededRevenue = CalcPositionRevenue_SHORT(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
                             if (revenue >= neededRevenue)
                             {
@@ -110,7 +112,9 @@ namespace OsEngine.Robots.Oleg.Good
                         decimal revenue = CalcPositionRevenue_LONG(volume, entryPrice, candle.Close, FEE_PERCENTS);
                         if (revenue > 0)
                         {
-                            decimal minTakeProfitPrice = entryPrice * (100 + MIN_PROFIT_PERCENTS) / 100;
+                            decimal moneyIn = CalcTradeMoney(volume, entryPrice, FEE_PERCENTS, Side.Buy);
+                            decimal wantedProfit = moneyIn * (100 + MIN_PROFIT_PERCENTS) / 100 - moneyIn;
+                            decimal minTakeProfitPrice = CalcPrice_LONG_TP_TakeWantedProfit(volume, entryPrice, wantedProfit, FEE_PERCENTS);
                             decimal neededRevenue = CalcPositionRevenue_LONG(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
                             if (revenue >= neededRevenue)
                             {
@@ -186,19 +190,19 @@ namespace OsEngine.Robots.Oleg.Good
             //}
         }
 
-        public decimal CalcPositionRevenue_LONG(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents)
+        private decimal CalcPositionRevenue_LONG(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents)
         {
             decimal fee;
             return CalcPositionRevenue_LONG(quantity, priceEntry, priceClose, feeInPercents, out fee);
         }
 
-        public decimal CalcPositionRevenue_SHORT(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents)
+        private decimal CalcPositionRevenue_SHORT(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents)
         {
             decimal fee;
             return CalcPositionRevenue_SHORT(quantity, priceEntry, priceClose, feeInPercents, out fee);
         }
 
-        public decimal CalcPositionRevenue_LONG(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents, out decimal fee)
+        private decimal CalcPositionRevenue_LONG(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents, out decimal fee)
         {
             decimal feeMoneySpent;
             decimal feeMoneyGot;
@@ -208,7 +212,7 @@ namespace OsEngine.Robots.Oleg.Good
             return moneyGot - moneySpent;
         }
 
-        public decimal CalcPositionRevenue_SHORT(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents, out decimal fee)
+        private decimal CalcPositionRevenue_SHORT(decimal quantity, decimal priceEntry, decimal priceClose, decimal feeInPercents, out decimal fee)
         {
             decimal feeMoneyGot;
             decimal feeMoneySpent;
@@ -218,11 +222,27 @@ namespace OsEngine.Robots.Oleg.Good
             return moneyGot - moneySpent;
         }
 
-        protected decimal CalcTradeMoney(decimal quantity, decimal price, decimal feeInPercents, Side side, out decimal fee)
+        private decimal CalcTradeMoney(decimal quantity, decimal price, decimal feeInPercents, Side side)
+        {
+            decimal fee;
+            return CalcTradeMoney(quantity, price, feeInPercents, side, out fee);
+        }
+
+        private decimal CalcTradeMoney(decimal quantity, decimal price, decimal feeInPercents, Side side, out decimal fee)
         {
             decimal moneyNoFee = quantity * price;
             fee = moneyNoFee / 100 * feeInPercents;
             return side == Side.Buy ? moneyNoFee + fee : moneyNoFee - fee;
+        }
+
+        private decimal CalcPrice_LONG_TP_TakeWantedProfit(decimal quantity, decimal entryPrice, decimal wantedCleanProfit, decimal feeInPercents)
+        {
+            return (quantity * entryPrice * (100 + feeInPercents) + 100 * wantedCleanProfit) / (quantity * (100 - feeInPercents));
+        }
+
+        private decimal CalcPrice_SHORT_TP_TakeWantedProfit(decimal quantity, decimal entryPrice, decimal wantedCleanProfit, decimal feeInPercents)
+        {
+            return (quantity * entryPrice * (100 - feeInPercents) - 100 * wantedCleanProfit) / (quantity * (100 + feeInPercents));
         }
     }
 }
