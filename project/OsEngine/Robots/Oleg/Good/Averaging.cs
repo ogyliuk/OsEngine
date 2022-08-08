@@ -12,8 +12,9 @@ namespace OsEngine.Robots.Oleg.Good
     public class Averaging : BotPanel
     {
         private static readonly decimal FEE_PERCENTS = 0.04m;
-        private static readonly decimal MIN_PROFIT_PERCENTS = 0.08m;
-        private static readonly decimal AVERAGING_THRESHOLD_PERCENTS = 0.08m;
+        private static readonly decimal MIN_PROFIT_PERCENTS = 0.05m;
+        private static readonly decimal AVERAGING_THRESHOLD_PERCENTS = 0.5m;
+        private static readonly int MAX_ENTRIES_NUMBER = 5;
 
         private BotTabSimple _tab;
 
@@ -100,10 +101,17 @@ namespace OsEngine.Robots.Oleg.Good
                                 decimal maxAllowedLoss = -(moneyIn * (100 + AVERAGING_THRESHOLD_PERCENTS) / 100 - moneyIn);
                                 if (Math.Abs(currentLoss) > Math.Abs(maxAllowedLoss))
                                 {
-                                    decimal newAveragingPositionVolume = positionsLong.Count == 1 ?
-                                        lastPosition.OpenVolume :
-                                        lastPosition.OpenVolume + positionsLong[positionsLong.Count - 2].OpenVolume;
-                                    _tab.BuyAtMarket(newAveragingPositionVolume);
+                                    if (positionsLong.Count < MAX_ENTRIES_NUMBER)
+                                    {
+                                        decimal newAveragingPositionVolume = positionsLong.Count == 1 ? 
+                                            lastPosition.OpenVolume : 
+                                            lastPosition.OpenVolume + positionsLong[positionsLong.Count - 2].OpenVolume;
+                                        _tab.BuyAtMarket(newAveragingPositionVolume);
+                                    }
+                                    else
+                                    {
+                                        positionsLong.ForEach(p => _tab.CloseAtMarket(p, p.OpenVolume));
+                                    }
                                 }
                             }
                         }
@@ -146,10 +154,17 @@ namespace OsEngine.Robots.Oleg.Good
                                 decimal maxAllowedLoss = -(moneyIn * (100 + AVERAGING_THRESHOLD_PERCENTS) / 100 - moneyIn);
                                 if (Math.Abs(currentLoss) > Math.Abs(maxAllowedLoss))
                                 {
-                                    decimal newAveragingPositionVolume = positionsShort.Count == 1 ?
-                                        lastPosition.OpenVolume :
-                                        lastPosition.OpenVolume + positionsShort[positionsShort.Count - 2].OpenVolume;
-                                    _tab.SellAtMarket(newAveragingPositionVolume);
+                                    if (positionsShort.Count < MAX_ENTRIES_NUMBER)
+                                    {
+                                        decimal newAveragingPositionVolume = positionsShort.Count == 1 ? 
+                                            lastPosition.OpenVolume :
+                                            lastPosition.OpenVolume + positionsShort[positionsShort.Count - 2].OpenVolume;
+                                        _tab.SellAtMarket(newAveragingPositionVolume);
+                                    }
+                                    else
+                                    {
+                                        positionsShort.ForEach(p => _tab.CloseAtMarket(p, p.OpenVolume));
+                                    }
                                 }
                             }
                         }
@@ -180,11 +195,31 @@ namespace OsEngine.Robots.Oleg.Good
             return new List<Position>();
         }
 
+        private int maxLongPosCount = 0;
+        private int maxShortPosCount = 0;
+
         private void _tab_PositionOpenEventHandler(Position position)
         {
             if (position != null && position.State == PositionStateType.Open)
             {
                 List<Position> positions = position.Direction == Side.Buy ? GetPositions_LONG() : GetPositions_SHORT();
+
+                if (position.Direction == Side.Buy)
+                {
+                    if (maxLongPosCount < positions.Count)
+                    {
+                        maxLongPosCount = positions.Count;
+                    }
+                }
+                else if (position.Direction == Side.Sell)
+                {
+                    if (maxShortPosCount < positions.Count)
+                    {
+                        maxShortPosCount = positions.Count;
+                    }
+                }
+                Console.WriteLine("maxLongPosCount = {0}; maxShortPosCount = {1}", maxLongPosCount, maxShortPosCount);
+
                 if (positions.Count > 1)
                 {
                     decimal totalVolume = positions.Select(p => p.OpenVolume).Sum();
@@ -195,10 +230,9 @@ namespace OsEngine.Robots.Oleg.Good
                         CalcPrice_LONG_TP_TakeWantedProfit(totalVolume, avgEntryPrice, wantedProfit, FEE_PERCENTS) : 
                         CalcPrice_SHORT_TP_TakeWantedProfit(totalVolume, avgEntryPrice, wantedProfit, FEE_PERCENTS);
 
-                    // int firstPositionNumber = positions.First().Number;
-                    // List<Position> positionsToAverage = positions.Where(p => p.Number > firstPositionNumber).ToList();
-
-                    foreach (Position positionToAverage in positions)
+                    int firstPositionNumber = positions.First().Number;
+                    List<Position> positionsToAverage = positions.Where(p => p.Number > firstPositionNumber).ToList();
+                    foreach (Position positionToAverage in positionsToAverage)
                     {
                         _tab.CloseAtProfit(positionToAverage, takeProfitPrice, takeProfitPrice);
                     }

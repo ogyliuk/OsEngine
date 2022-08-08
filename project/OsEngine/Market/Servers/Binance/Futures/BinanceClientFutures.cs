@@ -319,7 +319,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     }
                     else if (type_str_selector == "fapi")
                     {
-                        res = CreateQuery(Method.GET, "/" + type_str_selector + "/v2/account", null, true);
+                        Dictionary<string, string> param = new Dictionary<string, string>() { { "recvWindow=", "50000" } };
+                        res = CreateQuery(Method.GET, "/" + type_str_selector + "/v2/account", param, true);
                     }
 
                     if (res == null)
