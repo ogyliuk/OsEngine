@@ -12,9 +12,6 @@ namespace OsEngine.Robots.Oleg.Good
     public class Averaging : BotPanel
     {
         private static readonly decimal FEE_PERCENTS = 0.04m;
-        private static readonly decimal MIN_PROFIT_PERCENTS = 0.05m;
-        private static readonly decimal AVERAGING_THRESHOLD_PERCENTS = 0.5m;
-        private static readonly int MAX_ENTRIES_NUMBER = 5;
 
         private BotTabSimple _tab;
 
@@ -24,6 +21,20 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterInt VolumeDecimals;
 
         private StrategyParameterDecimal MinProfitInPercents;
+        private StrategyParameterInt MaxEntriesNumber;
+        private StrategyParameterDecimal AveragingThresholdPercents;
+
+        // **** BEST PARAMs ****
+        // === Only LONG ===
+        // Min profit %: 2.9
+        // Entries number: 5
+        // Averaging threshold: 4.3
+
+        // === LONG  + SHORT ===
+        // Min profit %: 1.7
+        // Entries number: 5
+        // Averaging threshold: 1.2
+        // **** BEST PARAMs ****
 
         public Averaging(string name, StartProgram startProgram) : base(name, startProgram)
         {
@@ -35,7 +46,9 @@ namespace OsEngine.Robots.Oleg.Good
             VolumeDecimals = CreateParameter("Decimals Volume", 2, 1, 50, 4, "Base");
             VolumeFirstEntry = CreateParameter("Volume", 1, 1m, 10, 1, "Base");
 
-            MinProfitInPercents = CreateParameter("Min PROFIT %", 0.1m, 0.1m, 1, 0.05m, "Base");
+            MinProfitInPercents = CreateParameter("Min PROFIT %", 0.5m, 0.5m, 3m, 0.1m, "Base");
+            MaxEntriesNumber = CreateParameter("Max entries number", 1, 1, 5, 1, "Base");
+            AveragingThresholdPercents = CreateParameter("Averaging threshold %", 0.5m, 0.5m, 5m, 0.1m, "Base");
 
             _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
             _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
@@ -79,7 +92,7 @@ namespace OsEngine.Robots.Oleg.Good
                         if (profit > 0)
                         {
                             decimal moneyIn = CalcTradeMoney(volume, entryPrice, FEE_PERCENTS, Side.Sell);
-                            decimal wantedProfit = moneyIn * (100 + MIN_PROFIT_PERCENTS) / 100 - moneyIn;
+                            decimal wantedProfit = moneyIn * (100 + MinProfitInPercents.ValueDecimal) / 100 - moneyIn;
                             decimal minTakeProfitPrice = CalcPrice_SHORT_TP_TakeWantedProfit(volume, entryPrice, wantedProfit, FEE_PERCENTS);
                             decimal neededProfit = CalcPositionRevenue_SHORT(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
                             if (profit >= neededProfit)
@@ -98,10 +111,10 @@ namespace OsEngine.Robots.Oleg.Good
                             if (currentLoss < 0)
                             {
                                 decimal moneyIn = CalcTradeMoney(lastPosition.OpenVolume, lastPosition.EntryPrice, FEE_PERCENTS, Side.Buy);
-                                decimal maxAllowedLoss = -(moneyIn * (100 + AVERAGING_THRESHOLD_PERCENTS) / 100 - moneyIn);
+                                decimal maxAllowedLoss = -(moneyIn * (100 + AveragingThresholdPercents.ValueDecimal) / 100 - moneyIn);
                                 if (Math.Abs(currentLoss) > Math.Abs(maxAllowedLoss))
                                 {
-                                    if (positionsLong.Count < MAX_ENTRIES_NUMBER)
+                                    if (positionsLong.Count < MaxEntriesNumber.ValueInt)
                                     {
                                         decimal newAveragingPositionVolume = positionsLong.Count == 1 ? 
                                             lastPosition.OpenVolume : 
@@ -132,7 +145,7 @@ namespace OsEngine.Robots.Oleg.Good
                         if (profit > 0)
                         {
                             decimal moneyIn = CalcTradeMoney(volume, entryPrice, FEE_PERCENTS, Side.Buy);
-                            decimal wantedProfit = moneyIn * (100 + MIN_PROFIT_PERCENTS) / 100 - moneyIn;
+                            decimal wantedProfit = moneyIn * (100 + MinProfitInPercents.ValueDecimal) / 100 - moneyIn;
                             decimal minTakeProfitPrice = CalcPrice_LONG_TP_TakeWantedProfit(volume, entryPrice, wantedProfit, FEE_PERCENTS);
                             decimal neededProfit = CalcPositionRevenue_LONG(volume, entryPrice, minTakeProfitPrice, FEE_PERCENTS);
                             if (profit >= neededProfit)
@@ -151,10 +164,10 @@ namespace OsEngine.Robots.Oleg.Good
                             if (currentLoss < 0)
                             {
                                 decimal moneyIn = CalcTradeMoney(lastPosition.OpenVolume, lastPosition.EntryPrice, FEE_PERCENTS, Side.Sell);
-                                decimal maxAllowedLoss = -(moneyIn * (100 + AVERAGING_THRESHOLD_PERCENTS) / 100 - moneyIn);
+                                decimal maxAllowedLoss = -(moneyIn * (100 + AveragingThresholdPercents.ValueDecimal) / 100 - moneyIn);
                                 if (Math.Abs(currentLoss) > Math.Abs(maxAllowedLoss))
                                 {
-                                    if (positionsShort.Count < MAX_ENTRIES_NUMBER)
+                                    if (positionsShort.Count < MaxEntriesNumber.ValueInt)
                                     {
                                         decimal newAveragingPositionVolume = positionsShort.Count == 1 ? 
                                             lastPosition.OpenVolume :
@@ -225,7 +238,7 @@ namespace OsEngine.Robots.Oleg.Good
                     decimal totalVolume = positions.Select(p => p.OpenVolume).Sum();
                     decimal avgEntryPrice = positions.Select(p => p.EntryPrice * p.OpenVolume).Sum() / totalVolume;
                     decimal moneyIn = CalcTradeMoney(totalVolume, avgEntryPrice, FEE_PERCENTS, position.Direction);
-                    decimal wantedProfit = moneyIn * (100 + MIN_PROFIT_PERCENTS) / 100 - moneyIn;
+                    decimal wantedProfit = moneyIn * (100 + MinProfitInPercents.ValueDecimal) / 100 - moneyIn;
                     decimal takeProfitPrice = position.Direction == Side.Buy ? 
                         CalcPrice_LONG_TP_TakeWantedProfit(totalVolume, avgEntryPrice, wantedProfit, FEE_PERCENTS) : 
                         CalcPrice_SHORT_TP_TakeWantedProfit(totalVolume, avgEntryPrice, wantedProfit, FEE_PERCENTS);
