@@ -1,0 +1,21 @@
+Regime#OnlyLong#Off#On#OnlyLong#OnlyShort#OnlyClosePosition#
+label2#--------#--------#10#5#-1#
+Volume type#Contract currency#Number of contracts#Contract currency#% of the total portfolio#
+Number of Digits after the decimal point in the volume#2#2#1#50#4#
+Volume#10#10#1,0#50#4#
+label1#--------#--------#10#5#-1#
+Slippage %#0#0#0#20#1#
+label3#--------#--------#10#5#-1#
+Start Trade Time#0:0:0:0#
+End Trade Time#24:0:0:0#
+label4#--------#--------#10#5#-1#
+Period Up Price Channel#30#55#1#50#4#
+Period Down Price Channel#85#55#1#50#4#
+label5#--------#--------#10#5#-1#
+Period Slow Ema#23#350#1#50#4#
+Period Fast Ema#8#25#1#50#4#
+label6#--------#--------#10#5#-1#
+Channel top position#Short#Long#Short#
+Sma Length Filter#300#100#10#500#1#
+Is SMA Filter On#True#False#
+Is Sma Slope Filter On#False#False#

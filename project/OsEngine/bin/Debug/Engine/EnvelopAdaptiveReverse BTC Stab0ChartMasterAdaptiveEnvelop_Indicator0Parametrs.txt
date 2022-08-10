@@ -1,0 +1,4 @@
+Adx Period#160#
+Ratio#400#
+Deviation#1,6#
+Sma Base#150#

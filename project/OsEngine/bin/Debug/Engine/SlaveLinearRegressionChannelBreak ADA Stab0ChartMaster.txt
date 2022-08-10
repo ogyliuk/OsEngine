@@ -1,0 +1,2 @@
+Sma@SlaveLinearRegressionChannelBreak ADA SSma_Filter@Prime@False@IsScript
+LinearRegressionChannelFast_Indicator@SlaveLinearRegressionChannelBreak ADA SLinearRegressionChannel@Prime@False@IsScript

@@ -1,0 +1,3 @@
+Atr@EnvelopAdaptiveParabolic BNB Stab0ChartMasterATR0@NewArea0@True
+EfficiencyRatio@EnvelopAdaptiveParabolic BNB Stab0ChartMasterEfficiencyRatio0@NewArea1@True
+MovingAverage@EnvelopAdaptiveParabolic BNB Stab0ChartMasterSma0@Prime@True

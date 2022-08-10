@@ -24,7 +24,10 @@ bld/
 
 
 # Block Logs and Temp files in Debug directory
-[Ee]ngine/
+[Ee]ngine/TransaqLog
+[Ee]ngine/Color
+[Ee]ngine/Log
+[Ee]ngine/Temp
 [Aa]stsBridge/
 Plaza/Log/
 Data/

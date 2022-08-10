@@ -1,0 +1,2 @@
+Sma@SlavePriceChannelAdaptiveReverse ETH FFSma_Filter@Prime@False@IsScript
+AdaptivePriceChannel_Indicator@SlavePriceChannelAdaptiveReverse ETH FFAPC@Prime@False@IsScript

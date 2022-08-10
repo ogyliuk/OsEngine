@@ -1,0 +1,8 @@
+Sma@SlaveHighLowByAtrBreakExtTime BNB MSma_Filter@Prime@False@IsScript
+Damping_Indicator@SlaveHighLowByAtrBreakExtTime BNB MDamping@dampingArea@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime BNB MSma1@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime BNB MSma2@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime BNB MSma3@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime BNB MSma4@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime BNB MSma5@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime BNB MSma6@Prime@False@IsScript

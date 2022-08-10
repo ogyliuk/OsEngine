@@ -1,0 +1,3 @@
+PriceChannel@PriceChannelReverseLong ETH Stab0ChartMasterPrice Channel0@Prime@True
+MovingAverage@PriceChannelReverseLong ETH Stab0ChartMasterSma0@Prime@True
+MovingAverage@PriceChannelReverseLong ETH Stab0ChartMasterSma1@Prime@True

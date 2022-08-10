@@ -1,0 +1,8 @@
+Sma@SlaveHighLowByAtrBreakExtTime ETH MSma_Filter@Prime@False@IsScript
+Damping_Indicator@SlaveHighLowByAtrBreakExtTime ETH MDamping@dampingArea@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime ETH MSma1@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime ETH MSma2@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime ETH MSma3@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime ETH MSma4@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime ETH MSma5@Prime@False@IsScript
+Sma@SlaveHighLowByAtrBreakExtTime ETH MSma6@Prime@False@IsScript

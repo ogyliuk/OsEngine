@@ -1,0 +1,1 @@
+AdaptivePriceChannel_Indicator@PriceChannelAdaptiveReverse ADA FFtab0ChartMasterAdaptivePriceChannel_Indicator0@Prime@True@IsScript

@@ -1,0 +1,1 @@
+LinearRegressionChannelFast_Indicator@LinearRegressionSmaImpulseLong_1 BTC Mtab0ChartMasterLinearRegressionChannelFast_Indicator0@Prime@True@IsScript

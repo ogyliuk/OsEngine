@@ -1,0 +1,1 @@
+LinearRegressionChannelFast_Indicator@LinearRegressionChannelBreak ETH Mtab0ChartMasterLinearRegressionChannelFast_Indicator0@Prime@True@IsScript

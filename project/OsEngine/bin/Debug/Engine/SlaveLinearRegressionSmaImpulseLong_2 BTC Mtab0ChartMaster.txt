@@ -1,0 +1,3 @@
+Sma@SlaveLinearRegressionSmaImpulseLong_2 BTC MSma_Filter@Prime@False@IsScript
+LinearRegressionChannelFast_Indicator@SlaveLinearRegressionSmaImpulseLong_2 BTC MLinearRegressionChannel@Prime@False@IsScript
+RSI@SlaveLinearRegressionSmaImpulseLong_2 BTC MRsi@RsiArea@False@IsScript

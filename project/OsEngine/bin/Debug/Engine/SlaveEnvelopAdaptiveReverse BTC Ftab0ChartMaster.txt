@@ -1,0 +1,2 @@
+Sma@SlaveEnvelopAdaptiveReverse BTC FSma_Filter@Prime@False@IsScript
+AdaptiveEnvelop_Indicator@SlaveEnvelopAdaptiveReverse BTC FAPC@Prime@False@IsScript

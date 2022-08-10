@@ -1,0 +1,7 @@
+-256
+23
+True
+Exponential
+Close
+2
+30

@@ -1,0 +1,1 @@
+AdaptivePriceChannel_Indicator@PriceChannelAdaptiveReverse ETH FFtab0ChartMasterAdaptivePriceChannel_Indicator0@Prime@True@IsScript

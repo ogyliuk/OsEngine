@@ -1,0 +1,12 @@
+Regime#On#Off#On#OnlyLong#OnlyShort#OnlyClosePosition#
+Volume type#Number of contracts#Number of contracts#Contract currency#% of the total portfolio#
+Number of Digits after the decimal point in the volume#2#2#1#50#4#
+Volume#10#10#1,0#50#4#
+Slippage %#0#0#0#20#1#
+Start Trade Time#0:0:0:0#
+End Trade Time#24:0:0:0#
+Step#0,17#0,02#0,001#3#0,001#
+MaxStep#0,011#0,2#0,01#1#0,01#
+Sma Length Filter#100#100#10#500#1#
+Is SMA Filter On#False#False#
+Is Sma Slope Filter On#False#False#

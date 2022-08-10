@@ -1,0 +1,2 @@
+Sma@SlavePriceChannelAdaptiveReverse ADA FFSma_Filter@Prime@False@IsScript
+AdaptivePriceChannel_Indicator@SlavePriceChannelAdaptiveReverse ADA FFAPC@Prime@False@IsScript

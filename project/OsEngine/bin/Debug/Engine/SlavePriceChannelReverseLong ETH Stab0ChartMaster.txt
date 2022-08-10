@@ -1,0 +1,3 @@
+PriceChannel@SlavePriceChannelReverseLong ETH SPrice Channel@Prime@False@IsScript
+Ema@SlavePriceChannelReverseLong ETH SEma Fast@Prime@False@IsScript
+Ema@SlavePriceChannelReverseLong ETH SEma Slow@Prime@False@IsScript

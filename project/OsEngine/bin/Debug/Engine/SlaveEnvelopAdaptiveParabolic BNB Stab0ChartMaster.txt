@@ -1,0 +1,4 @@
+Sma@SlaveEnvelopAdaptiveParabolic BNB SSma_Filter@Prime@False@IsScript
+Sma@SlaveEnvelopAdaptiveParabolic BNB SSma@Prime@False@IsScript
+ATR@SlaveEnvelopAdaptiveParabolic BNB SATR@ATR_Area@False@IsScript
+EfficiencyRatio@SlaveEnvelopAdaptiveParabolic BNB SEfficiencyRatio@EfficiencyRatio_area@False@IsScript
