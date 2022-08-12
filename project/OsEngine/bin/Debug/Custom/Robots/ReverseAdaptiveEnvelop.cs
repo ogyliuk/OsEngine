@@ -71,6 +71,7 @@ public class ReverseAdaptiveEnvelop : BotPanel
         _APC.ParametersDigit[3].Value = SmaBase.ValueInt;
         _APC.Save();
 
+        StopOrActivateIndicators();
         _tab.CandleFinishedEvent += _tab_CandleFinishedEvent;
         ParametrsChangeByUser += EnvelopAdaptivChannelsParam_ParametrsChangeByUser;
         EnvelopAdaptivChannelsParam_ParametrsChangeByUser();
@@ -85,6 +86,8 @@ public class ReverseAdaptiveEnvelop : BotPanel
 
     private void EnvelopAdaptivChannelsParam_ParametrsChangeByUser()
     {
+        StopOrActivateIndicators();
+
         if (_APC.ParametersDigit[0].Value != AdxPeriod.ValueInt ||
                 _APC.ParametersDigit[1].Value != Ratio.ValueInt ||
                 _APC.ParametersDigit[2].Value != Deviation.ValueDecimal ||
@@ -115,6 +118,21 @@ public class ReverseAdaptiveEnvelop : BotPanel
             {
                 _smaFilter.DataSeries[0].IsPaint = true;
             }
+        }
+    }
+
+    private void StopOrActivateIndicators()
+    {
+
+        if (SmaPositionFilterIsOn.ValueBool
+           != _smaFilter.IsOn && SmaSlopeFilterIsOn.ValueBool
+           != _smaFilter.IsOn)
+        {
+            _smaFilter.IsOn = SmaPositionFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+
+            _smaFilter.IsOn = SmaSlopeFilterIsOn.ValueBool;
+            _smaFilter.Reload();
         }
     }
 

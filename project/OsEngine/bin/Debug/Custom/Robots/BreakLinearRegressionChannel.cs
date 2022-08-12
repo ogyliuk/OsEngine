@@ -70,7 +70,7 @@ public class BreakLinearRegressionChannel : BotPanel
         _LinearRegression.ParametersDigit[2].Value = UpDeviation.ValueDecimal;
         _LinearRegression.Save();
 
-
+        StopOrActivateIndicators();
         _tab.CandleFinishedEvent += _tab_CandleFinishedEvent;
         ParametrsChangeByUser += LinearRegressionTraderParam_ParametrsChangeByUser;
         LinearRegressionTraderParam_ParametrsChangeByUser();
@@ -79,6 +79,8 @@ public class BreakLinearRegressionChannel : BotPanel
 
     private void LinearRegressionTraderParam_ParametrsChangeByUser()
     {
+        StopOrActivateIndicators();
+
         if (_LinearRegression.ParametersDigit[0].Value != PeriodLR.ValueInt ||
         _LinearRegression.ParametersDigit[1].Value != UpDeviation.ValueDecimal ||
         _LinearRegression.ParametersDigit[2].Value != UpDeviation.ValueDecimal)
@@ -114,6 +116,21 @@ public class BreakLinearRegressionChannel : BotPanel
             }
         }
 
+    }
+
+    private void StopOrActivateIndicators()
+    {
+
+        if (SmaPositionFilterIsOn.ValueBool
+           != _smaFilter.IsOn && SmaSlopeFilterIsOn.ValueBool
+           != _smaFilter.IsOn)
+        {
+            _smaFilter.IsOn = SmaPositionFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+
+            _smaFilter.IsOn = SmaSlopeFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+        }
     }
 
     public override string GetNameStrategyType()
@@ -187,7 +204,7 @@ public class BreakLinearRegressionChannel : BotPanel
         {
             decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
 
-            if (lastSma > prevSma)
+            if (lastSma < prevSma)
             {
                 return true;
             }

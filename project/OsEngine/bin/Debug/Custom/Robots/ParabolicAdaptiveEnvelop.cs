@@ -96,6 +96,7 @@ public class ParabolicAdaptiveEnvelop : BotPanel
         _eR.ParametersDigit[0].Value = ErLenght.ValueInt;
         _eR.Save();
 
+        StopOrActivateIndicators();
         ParametrsChangeByUser += StrategyParabolicVma_ParametrsChangeByUser;
         _tab.CandleFinishedEvent += StrategyAdxVolatility_CandleFinishedEvent;
         _tab.PositionOpeningSuccesEvent += _tab_PositionOpeningSuccesEvent;       
@@ -105,6 +106,8 @@ public class ParabolicAdaptiveEnvelop : BotPanel
 
     private void StrategyParabolicVma_ParametrsChangeByUser()
     {
+        StopOrActivateIndicators();
+
         if (_atr.ParametersDigit[0].Value != AtrLenght.ValueInt)
         {
             _atr.ParametersDigit[0].Value = AtrLenght.ValueInt;
@@ -147,6 +150,21 @@ public class ParabolicAdaptiveEnvelop : BotPanel
             {
                 _smaFilter.DataSeries[0].IsPaint = true;
             }
+        }
+    }
+
+    private void StopOrActivateIndicators()
+    {
+
+        if (SmaPositionFilterIsOn.ValueBool
+           != _smaFilter.IsOn && SmaSlopeFilterIsOn.ValueBool
+           != _smaFilter.IsOn)
+        {
+            _smaFilter.IsOn = SmaPositionFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+
+            _smaFilter.IsOn = SmaSlopeFilterIsOn.ValueBool;
+            _smaFilter.Reload();
         }
     }
 
@@ -232,7 +250,7 @@ public class ParabolicAdaptiveEnvelop : BotPanel
         {
             decimal prevSma = _smaFilter.DataSeries[0].Values[_smaFilter.DataSeries[0].Values.Count - 2];
 
-            if (lastSma > prevSma)
+            if (lastSma < prevSma)
             {
                 return true;
             }

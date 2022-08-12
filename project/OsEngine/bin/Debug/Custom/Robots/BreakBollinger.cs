@@ -1,33 +1,39 @@
-﻿using OsEngine.Entity;
+﻿using System;
+using System.Collections.Generic;
+using OsEngine.Entity;
 using OsEngine.Indicators;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.OsTrader.Panels.Tab;
-using System.Collections.Generic;
-using System;
 
-[Bot("BreakZZChannel")]
-public class BreakZZChannel : BotPanel
+
+[Bot("BreakBollinger")]
+public class BreakBollinger : BotPanel
 {
     BotTabSimple _tab;
-    StrategyParameterString Regime;
+
+    public StrategyParameterString Regime;
     public StrategyParameterDecimal VolumeOnPosition;
     public StrategyParameterString VolumeRegime;
     public StrategyParameterInt VolumeDecimals;
-    StrategyParameterDecimal Slippage;
+    public StrategyParameterDecimal Slippage;
 
     private StrategyParameterTimeOfDay TimeStart;
     private StrategyParameterTimeOfDay TimeEnd;
+
+    public Aindicator _bol;
+    public StrategyParameterInt _bolPeriod;
+    public StrategyParameterDecimal _bolDev;
+
+    public Aindicator _ma;
+    StrategyParameterInt _maPeriod;
 
     public Aindicator _smaFilter;
     private StrategyParameterInt SmaLengthFilter;
     public StrategyParameterBool SmaPositionFilterIsOn;
     public StrategyParameterBool SmaSlopeFilterIsOn;
 
-    Aindicator _zz;
-    StrategyParameterInt _lengthZZ;
-    
-    public BreakZZChannel(string name, StartProgram startProgram) : base(name, startProgram)
+    public BreakBollinger(string name, StartProgram startProgram) : base(name, startProgram)
     {
         TabCreate(BotTabType.Simple);
         _tab = TabsSimple[0];
@@ -41,11 +47,13 @@ public class BreakZZChannel : BotPanel
         TimeStart = CreateParameterTimeOfDay("Start Trade Time", 0, 0, 0, 0, "Base");
         TimeEnd = CreateParameterTimeOfDay("End Trade Time", 24, 0, 0, 0, "Base");
 
-        _lengthZZ = CreateParameter("Length ZZ", 50, 50, 200, 20, "Robot parameters");
+        _maPeriod = CreateParameter("Moving period", 14, 50, 100, 1, "Robot parameters");
+        _bolPeriod = CreateParameter("Bollinger period", 14, 50, 100, 1, "Robot parameters");
+        _bolDev = CreateParameter("Bollinger deviation", 2.15m, 1, 4, 0.2m, "Robot parameters");
 
         SmaLengthFilter = CreateParameter("Sma Length", 100, 10, 500, 1, "Filters");
 
-        SmaPositionFilterIsOn = CreateParameter("Is SMA Filter On", true, "Filters");
+        SmaPositionFilterIsOn = CreateParameter("Is SMA Filter On", false, "Filters");
         SmaSlopeFilterIsOn = CreateParameter("Is Sma Slope Filter On", false, "Filters");
 
         _smaFilter = IndicatorsFactory.CreateIndicatorByName(nameClass: "Sma", name: name + "Sma_Filter", canDelete: false);
@@ -54,26 +62,34 @@ public class BreakZZChannel : BotPanel
         _smaFilter.ParametersDigit[0].Value = SmaLengthFilter.ValueInt;
         _smaFilter.Save();
 
-        _zz = IndicatorsFactory.CreateIndicatorByName(nameClass: "ZigZagChannel_indicator", name: name + "ZigZagChannel", canDelete: false);
-        _zz = (Aindicator)_tab.CreateCandleIndicator(_zz, nameArea: "Prime");
-        _zz.ParametersDigit[0].Value = _lengthZZ.ValueInt;
-        _zz.Save();
+        _bol = IndicatorsFactory.CreateIndicatorByName(nameClass: "Bollinger", name: name + "Bollinger", canDelete: false);
+        _bol = (Aindicator)_tab.CreateCandleIndicator(_bol, nameArea: "Prime");
+        _bol.ParametersDigit[0].Value = _bolPeriod.ValueInt;
+        _bol.ParametersDigit[1].Value = _bolDev.ValueDecimal;
+        _bol.Save();
+
+        _ma = IndicatorsFactory.CreateIndicatorByName(nameClass: "Sma", name: name + "SMA", canDelete: false);
+        _ma = (Aindicator)_tab.CreateCandleIndicator(_ma, nameArea: "Prime");
+        _ma.ParametersDigit[0].Value = _maPeriod.ValueInt;
+        _ma.Save();
 
         StopOrActivateIndicators();
-        ParametrsChangeByUser += LRegBot_ParametrsChangeByUser;
+        ParametrsChangeByUser += BollMoving_ParametrsChangeByUser;
         _tab.CandleFinishedEvent += _tab_CandleFinishedEvent;
-        LRegBot_ParametrsChangeByUser();
+        BollMoving_ParametrsChangeByUser();
     }
 
-    private void LRegBot_ParametrsChangeByUser()
+    private void BollMoving_ParametrsChangeByUser()
     {
         StopOrActivateIndicators();
 
-        if (_zz.ParametersDigit[0].Value != _lengthZZ.ValueInt)
+        if (_bol.ParametersDigit[0].Value != _bolPeriod.ValueInt ||
+                        _bol.ParametersDigit[1].Value != _bolDev.ValueDecimal)
         {
-            _zz.ParametersDigit[0].Value = _lengthZZ.ValueInt;
-            _zz.Reload();
-            _zz.Save();
+            _bol.ParametersDigit[0].Value = _bolPeriod.ValueInt;
+            _bol.ParametersDigit[1].Value = _bolDev.ValueDecimal;
+            _bol.Reload();
+            _bol.Save();
         }
 
         if (_smaFilter.ParametersDigit[0].Value != SmaLengthFilter.ValueInt)
@@ -82,7 +98,6 @@ public class BreakZZChannel : BotPanel
             _smaFilter.Reload();
             _smaFilter.Save();
         }
-
 
         if (_smaFilter.DataSeries != null && _smaFilter.DataSeries.Count > 0)
         {
@@ -95,7 +110,6 @@ public class BreakZZChannel : BotPanel
                 _smaFilter.DataSeries[0].IsPaint = true;
             }
         }
-
     }
 
     private void StopOrActivateIndicators()
@@ -111,11 +125,12 @@ public class BreakZZChannel : BotPanel
             _smaFilter.IsOn = SmaSlopeFilterIsOn.ValueBool;
             _smaFilter.Reload();
         }
+
     }
 
     public override string GetNameStrategyType()
     {
-        return "BreakZZChannel";
+        return "BreakBollinger";
     }
 
     public override void ShowIndividualSettingsDialog()
@@ -131,7 +146,10 @@ public class BreakZZChannel : BotPanel
         {
             return;
         }
-
+        if (_tab.CandlesAll == null)
+        {
+            return;
+        }
         if (TimeStart.Value > _tab.TimeServerCurrent ||
             TimeEnd.Value < _tab.TimeServerCurrent)
         {
@@ -139,11 +157,7 @@ public class BreakZZChannel : BotPanel
             return;
         }
 
-        if (_tab.CandlesAll == null)
-        {
-            return;
-        }
-        if (_lengthZZ.ValueInt >= candles.Count)
+        if (_maPeriod.ValueInt + 10 >= candles.Count || _bolPeriod.ValueInt + 10 >= candles.Count)
         {
             return;
         }
@@ -154,51 +168,45 @@ public class BreakZZChannel : BotPanel
         }
 
         List<Position> positions = _tab.PositionsOpenAll;
-        decimal lastCandle = candles[candles.Count - 1].Close;
-        decimal bb_up = _zz.DataSeries[4].Last;
-        decimal flag = lastCandle;
-        decimal bb_down = _zz.DataSeries[5].Last;
-
         decimal lastMaFilter = _smaFilter.DataSeries[0].Last;
-        if (bb_down <= 0) return;
-        if (bb_up <= 0) return;
-
+        decimal bol_up = _bol.DataSeries[0].Last;
+        decimal bol_down = _bol.DataSeries[1].Last;
+        decimal bol_center = _bol.DataSeries[2].Last;
+        decimal lastPrice = candles[candles.Count - 1].Close;
         decimal _slippage = 0;
 
         if (positions.Count == 0)
         {// enter logic
-
-            
-            _slippage = Slippage.ValueDecimal * bb_up / 100;
-
-            if (!BuySignalIsFiltered(candles))
+            if (bol_up > lastMaFilter && lastPrice <= bol_up)
             {
-                if (lastMaFilter > bb_up)
+                if (BuySignalIsFiltered(candles) == false)
                 {
-                    return;
+                    _slippage = Slippage.ValueDecimal * bol_up / 100;
+                    _tab.BuyAtStop(GetVolume(), bol_up + _slippage, bol_up, StopActivateType.HigherOrEqual, 1);
                 }
-
-                _tab.BuyAtStop(GetVolume(), bb_up + _slippage, bb_up, StopActivateType.HigherOrEqual, 1);
             }
-            _slippage = Slippage.ValueDecimal * bb_down / 100;
-
-            if (!SellSignalIsFiltered(candles))
+            if (bol_down < lastMaFilter && lastPrice >= bol_down)
             {
-                if (lastMaFilter < bb_down)
+                if (SellSignalIsFiltered(candles) == false)
                 {
-                    return;
+                    _slippage = Slippage.ValueDecimal * bol_down / 100;
+                    _tab.SellAtStop(GetVolume(), bol_down - _slippage, bol_down, StopActivateType.LowerOrEqyal, 1);
                 }
-
-                _tab.SellAtStop(GetVolume(), bb_down - _slippage, bb_down, StopActivateType.LowerOrEqyal, 1);
             }
+            if (lastPrice < lastMaFilter || BuySignalIsFiltered(candles))
+            {
+                _tab.BuyAtStopCancel();
+            }
+            if (lastPrice > lastMaFilter || SellSignalIsFiltered(candles))
+            {
+                _tab.SellAtStopCancel();
+            }
+
         }
         else
         {//exit logic
             for (int i = 0; i < positions.Count; i++)
             {
-                _tab.BuyAtStopCancel();
-                _tab.SellAtStopCancel();
-
                 if (positions[i].State != PositionStateType.Open)
                 {
                     continue;
@@ -207,18 +215,16 @@ public class BreakZZChannel : BotPanel
 
                 if (positions[i].Direction == Side.Buy)
                 {// logic to close long position
-                    stop_level = bb_down < lastMaFilter ? bb_down : lastMaFilter;
-                    _slippage = Slippage.ValueDecimal * stop_level / 100;
-
+                    stop_level = bol_center > lastMaFilter ? bol_center : lastMaFilter;
                     //   _tab.CloseAtStop(positions[i], stop_level, stop_level - _slippage.ValueInt * _tab.Securiti.PriceStep);
+                    _slippage = Slippage.ValueDecimal * stop_level / 100;
                     _tab.CloseAtTrailingStop(positions[i], stop_level, stop_level - _slippage);
                 }
                 else if (positions[i].Direction == Side.Sell)
                 {//logic to close short position
-                    stop_level = bb_up > lastMaFilter && bb_up > 0 ? bb_up : lastMaFilter;
-                    _slippage = Slippage.ValueDecimal * stop_level / 100;
-
+                    stop_level = bol_center < lastMaFilter && bol_center > 0 ? bol_center : lastMaFilter;
                     // _tab.CloseAtStop(positions[i], stop_level, stop_level + _slippage.ValueInt * _tab.Securiti.PriceStep);
+                    _slippage = Slippage.ValueDecimal * stop_level / 100;
                     _tab.CloseAtTrailingStop(positions[i], stop_level, stop_level + _slippage);
                 }
 
@@ -253,7 +259,7 @@ public class BreakZZChannel : BotPanel
             Regime.ValueString == "OnlyClosePosition")
         {
             return true;
-            //если режим работы робота не соответсвует направлению позиции
+            //если режим работы робота не соответсвует направлению позициивозвращаем на верх true
         }
 
         if (SmaPositionFilterIsOn.ValueBool)
@@ -332,5 +338,4 @@ public class BreakZZChannel : BotPanel
         }
     }
 }
-
 

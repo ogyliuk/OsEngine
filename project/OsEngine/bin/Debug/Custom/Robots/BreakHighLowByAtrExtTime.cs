@@ -109,12 +109,15 @@ public class BreakHighLowByAtrExtTime : BotPanel
         avgLowShifted.ParametersDigit[0].Value = 4;
         avgLowShifted.DataSeries[0].IsPaint = false;
 
+        StopOrActivateIndicators();
         ParametrsChangeByUser += DampIndex_Param_ParametrsChangeByUser;
         DampIndex_Param_ParametrsChangeByUser();
     }
 
     private void DampIndex_Param_ParametrsChangeByUser()
     {
+        StopOrActivateIndicators();
+
         if (_damping.ParametersDigit[0].Value != DampingPeriod.ValueInt)
         {
             _damping.ParametersDigit[0].Value = DampingPeriod.ValueInt;
@@ -146,6 +149,22 @@ public class BreakHighLowByAtrExtTime : BotPanel
                 _smaFilter.DataSeries[0].IsPaint = true;
             }
         }
+    }
+
+    private void StopOrActivateIndicators()
+    {
+
+        if (SmaPositionFilterIsOn.ValueBool
+           != _smaFilter.IsOn && SmaSlopeFilterIsOn.ValueBool
+           != _smaFilter.IsOn)
+        {
+            _smaFilter.IsOn = SmaPositionFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+
+            _smaFilter.IsOn = SmaSlopeFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+        }
+
     }
 
     public override string GetNameStrategyType()

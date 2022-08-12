@@ -65,6 +65,7 @@ public class ReverseAdaptivePriceChannel : BotPanel
         _APC.ParametersDigit[1].Value = Ratio.ValueInt;
         _APC.Save();
 
+        StopOrActivateIndicators();
         ParametrsChangeByUser += RoncoParam_ParametrsChangeByUser;
         _tab.CandleFinishedEvent += _tab_CandleFinishedEvent;
         RoncoParam_ParametrsChangeByUser();
@@ -79,6 +80,8 @@ public class ReverseAdaptivePriceChannel : BotPanel
 
     private void RoncoParam_ParametrsChangeByUser()
     {
+        StopOrActivateIndicators();
+
         if (_APC.ParametersDigit[0].Value != AdxPeriod.ValueInt ||
                 _APC.ParametersDigit[1].Value != Ratio.ValueInt)
         {
@@ -111,6 +114,21 @@ public class ReverseAdaptivePriceChannel : BotPanel
             }
         }
 
+    }
+
+    private void StopOrActivateIndicators()
+    {
+
+        if (SmaPositionFilterIsOn.ValueBool
+           != _smaFilter.IsOn && SmaSlopeFilterIsOn.ValueBool
+           != _smaFilter.IsOn)
+        {
+            _smaFilter.IsOn = SmaPositionFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+
+            _smaFilter.IsOn = SmaSlopeFilterIsOn.ValueBool;
+            _smaFilter.Reload();
+        }
     }
 
     public override string GetNameStrategyType()
