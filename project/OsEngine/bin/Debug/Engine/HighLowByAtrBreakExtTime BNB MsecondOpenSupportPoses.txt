@@ -1,1 +1,0 @@
-Sell#Opening#HighLowByAtrBreakExtTime BNB Mtab0#0#0#871@BinanceFutures@@Sell@292,00@292,00@0,41@0@Fail@Limit@01.01.0001 0:00:00@BNBUSDT@BinanceFutures@08.06.2022 16:30:01@01.01.0001 0:00:00@01.01.0001 0:00:00@1.00:00:00@null@@01.01.0001 0:00:00@^#41748##False#0#0#False#0#0,01#0,010#0,010#1#0#06.06.2022 20:30:00##0,04#Percent#BNBUSDT

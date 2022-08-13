@@ -1,3 +1,0 @@
-Sma@SlaveLinearRegressionSmaImpulseShort BNB FSma_Filter@Prime@False@IsScript
-LinearRegressionChannelFast_Indicator@SlaveLinearRegressionSmaImpulseShort BNB FLinearRegressionChannel@Prime@False@IsScript
-RSI@SlaveLinearRegressionSmaImpulseShort BNB FRsi@RsiArea@False@IsScript

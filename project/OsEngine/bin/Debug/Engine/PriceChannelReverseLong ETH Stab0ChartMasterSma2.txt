@@ -1,7 +1,0 @@
--32640
-300
-True
-Simple
-Close
-2
-30

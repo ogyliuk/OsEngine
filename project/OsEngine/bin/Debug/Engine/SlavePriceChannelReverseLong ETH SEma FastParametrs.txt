@@ -1,2 +1,0 @@
-Length#8#
-Candle Point#Close#

@@ -1,2 +1,0 @@
-Sma@SlaveLinearRegressionChannelBreak BNB SSma_Filter@Prime@False@IsScript
-LinearRegressionChannelFast_Indicator@SlaveLinearRegressionChannelBreak BNB SLinearRegressionChannel@Prime@False@IsScript

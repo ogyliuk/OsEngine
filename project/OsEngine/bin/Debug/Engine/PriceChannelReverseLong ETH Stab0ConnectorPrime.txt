@@ -1,5 +1,0 @@
-BinanceFutures
-False
-ETHUSDT
-BinanceFutures
-USDT

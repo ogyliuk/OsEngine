@@ -1,5 +1,0 @@
-BinanceFutures
-False
-BNBUSDT
-BinanceFutures
-USDT

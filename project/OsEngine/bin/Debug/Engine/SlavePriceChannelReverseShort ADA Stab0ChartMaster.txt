@@ -1,3 +1,0 @@
-PriceChannel@SlavePriceChannelReverseShort ADA SPrice Channel@Prime@False@IsScript
-Ema@SlavePriceChannelReverseShort ADA SEma Fast@Prime@False@IsScript
-Ema@SlavePriceChannelReverseShort ADA SEma Slow@Prime@False@IsScript
