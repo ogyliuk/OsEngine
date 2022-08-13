@@ -1,2 +1,2 @@
-Length#100#
+Length#10#
 Candle Point#Close#

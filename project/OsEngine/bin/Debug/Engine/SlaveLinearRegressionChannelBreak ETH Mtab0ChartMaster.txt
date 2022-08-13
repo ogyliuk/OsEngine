@@ -1,2 +1,0 @@
-Sma@SlaveLinearRegressionChannelBreak ETH MSma_Filter@Prime@False@IsScript
-LinearRegressionChannelFast_Indicator@SlaveLinearRegressionChannelBreak ETH MLinearRegressionChannel@Prime@False@IsScript

@@ -1,5 +1,0 @@
-BinanceFutures
-False
-ADAUSDT
-BinanceFutures
-USDT

@@ -1,2 +1,0 @@
-Sma@SlaveZZChannelBreak ETH SSma_Filter@Prime@False@IsScript
-ZigZagChannel_indicator@SlaveZZChannelBreak ETH SZigZagChannel@Prime@False@IsScript

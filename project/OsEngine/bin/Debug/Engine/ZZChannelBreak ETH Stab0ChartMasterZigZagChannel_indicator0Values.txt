@@ -1,6 +1,0 @@
-ZigZag&-10185235&Point&True&
-ZigZagLine&-10185235&Point&True&
-_seriesZigZagHighs&-5374161&Point&True&
-_seriesZigZagLows&-65536&Point&True&
-_seriesZigZagUpChannel&-7667712&Point&True&
-_seriesZigZagDownChannel&-16751616&Point&True&

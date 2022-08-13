@@ -1,2 +1,0 @@
-Sma@SlaveEnvelopAdaptiveReverse ETH FSma_Filter@Prime@False@IsScript
-AdaptiveEnvelop_Indicator@SlaveEnvelopAdaptiveReverse ETH FAPC@Prime@False@IsScript

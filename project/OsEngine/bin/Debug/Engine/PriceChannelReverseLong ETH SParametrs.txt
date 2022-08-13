@@ -2,9 +2,9 @@ Regime#On#Off#On#
 Начало торгов#0:0:0:0#
 Конец торгов#24:0:0:0#
 Встроенная стратегия#ReversPriceChannel#AroonBot#BreakHighLowByAtrExtTime#BreakLinearRegressionChannel#BreakZZChannel#MasterBotClassic#ParabolicAdaptiveEnvelop#ParabolicSarClassicTrade#QStickBot#ReverseAdaptiveEnvelop#ReverseAdaptivePriceChannel#ReversPriceChannel#StochasticTrade#StrategyLevermor#None#
-Объём входа#5,3#10#1,0#50#4#
+Объём входа#15#10#1,0#50#4#
 Тип объёма#% от Общего объёма портфеля#Кол-во контрактов#Валюта контракта#% от Общего объёма портфеля#
-Общий объём портфеля#1104,54748778#5000#1#50000#100#
+Общий объём портфеля#1128,96503603#5000#1#50000#100#
 Знаков в объёме после запятой#3#2#1#50#4#
 Авто обновление объёма#False#False#
 Мультипликатор для авто-обновелния портфеля#1#1#1#15#1#

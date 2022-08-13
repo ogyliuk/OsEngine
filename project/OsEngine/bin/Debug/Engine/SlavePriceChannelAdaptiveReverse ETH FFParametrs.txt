@@ -5,8 +5,8 @@ Volume#10#10#1,0#50#4#
 Slippage %#0#0#0#20#1#
 Start Trade Time#0:0:0:0#
 End Trade Time#24:0:0:0#
-Ronco Period#260#14#2#300#12#
-Ratio#290#100#50#300#10#
-Sma Length Filter#100#100#10#500#1#
+Ronco Period#385#14#2#300#12#
+Ratio#245#100#50#300#10#
+Sma Length Filter#10#100#10#500#1#
 Is SMA Filter On#False#False#
 Is Sma Slope Filter On#False#False#

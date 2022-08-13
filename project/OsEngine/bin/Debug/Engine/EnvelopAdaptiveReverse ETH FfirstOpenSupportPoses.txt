@@ -1,1 +1,0 @@
-Buy#Deleted#EnvelopAdaptiveReverse ETH Ftab0#0#0#885@BinanceFutures@@Buy@1824,25@1824,25@0,065@0@None@Limit@01.01.0001 0:00:00@ETHUSDT@BinanceFutures@09.06.2022 9:16:00@01.01.0001 0:00:00@01.01.0001 0:00:00@1.00:00:00@null@@01.01.0001 0:00:00@^#42582##False#0#0#False#0#0,001#0,01#0,01#1#0#09.06.2022 9:00:00##0,04#Percent#ETHUSDT

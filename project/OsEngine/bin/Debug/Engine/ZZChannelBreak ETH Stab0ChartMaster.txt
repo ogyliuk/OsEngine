@@ -1,2 +1,0 @@
-ZigZagChannel_indicator@ZZChannelBreak ETH Stab0ChartMasterZigZagChannel_indicator0@Prime@True@IsScript
-MovingAverage@ZZChannelBreak ETH Stab0ChartMasterSma0@Prime@True
