@@ -52,7 +52,7 @@ namespace OsEngine.Robots.Oleg.Good
             _bollinger.Save();
 
             _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
-            _tab.NewTickEvent += _tab_NewTickEventHandler;
+            _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler;
 
             ParametrsChangeByUser += ParametersChangeByUserEventHandler;
             ParametersChangeByUserEventHandler();
@@ -77,7 +77,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         public override void ShowIndividualSettingsDialog() { }
 
-        private void _tab_NewTickEventHandler(Trade trade)
+        private void _tab_CandleUpdateEventHandler(List<Candle> candles)
         {
             if (Regime.ValueString == "Off")
             {
@@ -94,9 +94,9 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (_tab.PositionsOpenAll.Count == 0)
             {
-                if (trade.Price > _bollinger.DataSeries[0].Last)
+                if (candles.Last().Close > _bollinger.DataSeries[0].Last)
                 {
-                    _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, trade.Price);
+                    _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
                 }
 
                 // _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
