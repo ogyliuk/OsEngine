@@ -892,6 +892,7 @@
     <Compile Include="Robots\Oleg\Good\Averaging.cs" />
     <Compile Include="Robots\Oleg\Good\RecoveryZone.cs" />
     <Compile Include="Robots\Oleg\Good\DivergenceContrTrend.cs" />
+    <Compile Include="Robots\Oleg\Good\ScalpingStrategy.cs" />
     <Compile Include="Robots\OnScriptIndicators\GridSample.cs" />
     <Compile Include="Robots\Engines\CandleEngine.cs" />
     <Compile Include="Robots\Engines\ClusterEngine.cs" />
