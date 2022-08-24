@@ -5,6 +5,7 @@ using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.OsTrader.Panels.Tab;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OsEngine.Robots.Oleg.Good
 {
@@ -12,6 +13,9 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("ScalpingStrategy")]
     public class ScalpingStrategy : BotPanel
     {
+        private TradingState _state;
+        private int _badCandlesCount;
+
         private BotTabSimple _tab;
 
         private Aindicator _emaFast;
@@ -27,9 +31,14 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterInt EmaFastLength;
         private StrategyParameterInt EmaSlowLength;
         private StrategyParameterInt AtrLength;
+        private StrategyParameterInt BadCandlesNumber;
+        private StrategyParameterDecimal StopLossSizeFromAtr;
+        private StrategyParameterDecimal TakeProfitSizeFromStopLoss;
 
         public ScalpingStrategy(string name, StartProgram startProgram) : base(name, startProgram)
         {
+            ResetTempParams();
+
             TabCreate(BotTabType.Simple);
             _tab = TabsSimple[0];
 
@@ -42,6 +51,9 @@ namespace OsEngine.Robots.Oleg.Good
             EmaFastLength = CreateParameter("EMA FAST length", 50, 20, 100, 5, "Robot parameters");
             EmaSlowLength = CreateParameter("EMA SLOW length", 200, 100, 400, 10, "Robot parameters");
             AtrLength = CreateParameter("ATR length", 14, 10, 50, 2, "Robot parameters");
+            BadCandlesNumber = CreateParameter("Bad candles number", 3, 2, 5, 1, "Robot parameters");
+            StopLossSizeFromAtr = CreateParameter("SL size (from ATR)", 2m, 1m, 3m, 0.5m, "Robot parameters");
+            TakeProfitSizeFromStopLoss = CreateParameter("TP size (from SL)", 1.5m, 1m, 3m, 0.5m, "Robot parameters");
 
             _emaFast = IndicatorsFactory.CreateIndicatorByName(nameClass: "Ema", name: name + "EmaFAST", canDelete: false);
             _emaFast = (Aindicator)_tab.CreateCandleIndicator(_emaFast, nameArea: "Prime");
@@ -66,6 +78,12 @@ namespace OsEngine.Robots.Oleg.Good
 
             ParametrsChangeByUser += ParametersChangeByUserEventHandler;
             ParametersChangeByUserEventHandler();
+        }
+
+        private void ResetTempParams()
+        {
+            _state = TradingState.FREE;
+            _badCandlesCount = 0;
         }
 
         private void ParametersChangeByUserEventHandler()
@@ -115,10 +133,96 @@ namespace OsEngine.Robots.Oleg.Good
                 return;
             }
 
-            decimal lastCandleClosePrice = candles[candles.Count - 1].Close;
             if (_tab.PositionsOpenAll.Count == 0)
             {
-                // TODO : enter here
+                decimal emaFastValue = _emaFast.DataSeries[0].Values.Last();
+                decimal emaSlowValue = _emaSlow.DataSeries[0].Values.Last();
+                
+                bool freeState = _state == TradingState.FREE;
+                bool crossFoundState = _state == TradingState.LONG_CROSS_FOUND || _state == TradingState.SHORT_CROSS_FOUND;
+
+                // CROSS check
+                if (freeState)
+                {
+                    decimal emaFastPreviousValue = _emaFast.DataSeries[0].Values[_emaFast.DataSeries[0].Values.Count - 2];
+                    decimal emaSlowPreviousValue = _emaSlow.DataSeries[0].Values[_emaSlow.DataSeries[0].Values.Count - 2];
+
+                    bool longCross = emaFastValue >= emaSlowValue && emaFastPreviousValue < emaSlowPreviousValue;
+                    if (longCross)
+                    {
+                        _state = TradingState.LONG_CROSS_FOUND;
+                    }
+
+                    bool shortCross = emaFastValue <= emaSlowValue && emaFastPreviousValue > emaSlowPreviousValue;
+                    if (shortCross)
+                    {
+                        _state = TradingState.SHORT_CROSS_FOUND;
+                    }
+                }
+                // TOUCH check
+                else if (crossFoundState)
+                {
+                    bool longCross = _state == TradingState.LONG_CROSS_FOUND;
+                    bool fastEmaTouchedDown = candles.Last().Low < emaFastValue;
+                    if (longCross && fastEmaTouchedDown)
+                    {
+                        _state = TradingState.LONG_TOUCH_DETECTED;
+                    }
+
+                    bool shortCross = _state == TradingState.SHORT_CROSS_FOUND;
+                    bool fastEmaTouchedUp = candles.Last().High > emaFastValue;
+                    if (shortCross && fastEmaTouchedUp)
+                    {
+                        _state = TradingState.SHORT_TOUCH_DETECTED;
+                    }
+                }
+
+                // REBOUND or LOST SIGNAL check
+                bool touchDetectedState = _state == TradingState.LONG_TOUCH_DETECTED || _state == TradingState.SHORT_TOUCH_DETECTED;
+                if (touchDetectedState)
+                {
+                    bool longTouch = _state == TradingState.LONG_TOUCH_DETECTED;
+                    if (longTouch)
+                    {
+                        // Check SIGNAL lose
+                        if (candles.Last().Close < emaSlowValue) _badCandlesCount++;
+                        bool signalLost = _badCandlesCount >= BadCandlesNumber.ValueInt;
+                        if (signalLost)
+                        {
+                            ResetTempParams();
+                            return;
+                        }
+
+                        // Check ENTRY
+                        bool reboundedUp = candles.Last().Close > emaFastValue;
+                        if (reboundedUp)
+                        {
+                            ResetTempParams();
+                            _tab.BuyAtMarket(GetVolume());
+                        }
+                    }
+
+                    bool shortTouch = _state == TradingState.SHORT_TOUCH_DETECTED;
+                    if (shortTouch)
+                    {
+                        // Check SIGNAL lose
+                        if (candles.Last().Close > emaSlowValue) _badCandlesCount++;
+                        bool signalLost = _badCandlesCount >= BadCandlesNumber.ValueInt;
+                        if (signalLost)
+                        {
+                            ResetTempParams();
+                            return;
+                        }
+
+                        // Check ENTRY
+                        bool reboundedDown = candles.Last().Close < emaFastValue;
+                        if (reboundedDown)
+                        {
+                            ResetTempParams();
+                            _tab.SellAtMarket(GetVolume());
+                        }
+                    }
+                }
             }
         }
 
@@ -132,11 +236,16 @@ namespace OsEngine.Robots.Oleg.Good
                 decimal atrValue = _atr.DataSeries[0].Last;
 
                 // STOP LOSS
-                decimal SL_TriggerPrice = longDeal ? position.EntryPrice - atrValue : position.EntryPrice + atrValue;
+                decimal SL_size = atrValue * StopLossSizeFromAtr.ValueDecimal;
+                decimal SL_TriggerPrice = longDeal ? position.EntryPrice - SL_size : position.EntryPrice + SL_size;
                 decimal SL_Price = longDeal ? SL_TriggerPrice - slippage : SL_TriggerPrice + slippage;
-
-                // Orders
                 _tab.CloseAtStop(position, SL_TriggerPrice, SL_Price);
+
+                // TAKE PROFIT
+                decimal TP_size = SL_size * TakeProfitSizeFromStopLoss.ValueDecimal;
+                decimal TP_TriggerPrice = longDeal ? position.EntryPrice + TP_size : position.EntryPrice - TP_size;
+                decimal TP_Price = longDeal ? TP_TriggerPrice - slippage : TP_TriggerPrice + slippage;
+                _tab.CloseAtProfit(position, TP_TriggerPrice, TP_Price);
             }
         }
 
@@ -158,6 +267,15 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 return Math.Round(_tab.Portfolio.ValueCurrent * (volume / 100) / _tab.PriceBestAsk / _tab.Securiti.Lot, VolumeDecimals.ValueInt);
             }
+        }
+
+        enum TradingState
+        {
+            FREE,
+            LONG_CROSS_FOUND,
+            LONG_TOUCH_DETECTED,
+            SHORT_CROSS_FOUND,
+            SHORT_TOUCH_DETECTED
         }
     }
 }
