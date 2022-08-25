@@ -9,6 +9,14 @@ using System.Linq;
 
 namespace OsEngine.Robots.Oleg.Good
 {
+    // Recommended settings for ADA 1m (122% profit for 1 year):
+    // Regime = ON
+    // EMA FAST = 50
+    // EMA SLOW = 200
+    // AT = 14
+    // Bad candles = 3
+    // SL size in ATRs = 3,6
+    // TP size in SLs = 1
     // https://www.youtube.com/watch?v=ohtnf4H_HMA
     [Bot("ScalpingStrategy")]
     public class ScalpingStrategy : BotPanel
@@ -198,7 +206,8 @@ namespace OsEngine.Robots.Oleg.Good
                         if (reboundedUp)
                         {
                             ResetTempParams();
-                            _tab.BuyAtMarket(GetVolume());
+                            //_tab.BuyAtMarket(GetVolume()); - planned, but test show that we need to do opposite
+                            _tab.SellAtMarket(GetVolume());
                         }
                     }
 
@@ -219,7 +228,8 @@ namespace OsEngine.Robots.Oleg.Good
                         if (reboundedDown)
                         {
                             ResetTempParams();
-                            _tab.SellAtMarket(GetVolume());
+                            //_tab.SellAtMarket(GetVolume()); - planned, but test show that we need to do opposite
+                            _tab.BuyAtMarket(GetVolume());
                         }
                     }
                 }
