@@ -4,9 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OsEngine.Charts.CandleChart.Indicators
 {
@@ -21,14 +18,13 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public BollingerWithSqueeze(string uniqName, bool canDelete)
         {
             Name = uniqName;
-
             TypeIndicator = IndicatorChartPaintType.Line;
             ColorSqueeze = Color.Brown;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
-            SqueezePeriod = 130;
+            Lenght = 20;
             Deviation = 2;
-            Lenght = 12;
+            SqueezePeriod = 130;
             PaintOn = true;
             CanDelete = canDelete;
             Load();
@@ -47,9 +43,9 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ColorSqueeze = Color.Brown;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
-            SqueezePeriod = 130;
+            Lenght = 20;
             Deviation = 2;
-            Lenght = 12;
+            SqueezePeriod = 130;
             PaintOn = true;
             CanDelete = canDelete;
         }
@@ -65,6 +61,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 List<List<decimal>> list = new List<List<decimal>>();
                 list.Add(ValuesUp);
                 list.Add(ValuesDown);
+                list.Add(ValuesSqueeze);
                 return list;
             }
         }
@@ -78,9 +75,9 @@ namespace OsEngine.Charts.CandleChart.Indicators
             get
             {
                 List<Color> colors = new List<Color>();
-                colors.Add(ColorSqueeze);
                 colors.Add(ColorUp);
                 colors.Add(ColorDown);
+                colors.Add(ColorSqueeze);
                 return colors;
             }
 
@@ -128,17 +125,17 @@ namespace OsEngine.Charts.CandleChart.Indicators
         { get; set; }
 
         /// <summary>
+        /// squeeze of bollinger
+        /// сужения линий боллинджера
+        /// </summary>
+        public List<decimal> ValuesSqueeze
+        { get; set; }
+
+        /// <summary>
         /// unique indicator name
         /// уникальное имя индикатора
         /// </summary>
         public string Name
-        { get; set; }
-
-        /// <summary>
-        /// squeeze period length to calculate indicator
-        /// длина расчёта индикатора сужения
-        /// </summary>
-        public decimal SqueezePeriod
         { get; set; }
 
         /// <summary>
@@ -156,10 +153,10 @@ namespace OsEngine.Charts.CandleChart.Indicators
         { get; set; }
 
         /// <summary>
-        /// color of bollinger bands squeeze data series
-        /// цвет сужения
+        /// squeeze period length to calculate indicator
+        /// длина расчёта индикатора сужения
         /// </summary>
-        public Color ColorSqueeze
+        public decimal SqueezePeriod
         { get; set; }
 
         /// <summary>
@@ -174,6 +171,13 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// цвет нижней серии данных
         /// </summary>
         public Color ColorDown
+        { get; set; }
+
+        /// <summary>
+        /// color of bollinger bands squeeze data series
+        /// цвет сужения
+        /// </summary>
+        public Color ColorSqueeze
         { get; set; }
 
         /// <summary>
@@ -197,12 +201,12 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 using (StreamReader reader = new StreamReader(@"Engine\" + Name + @".txt"))
                 {
-                    ColorSqueeze = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
                     ColorUp = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
                     ColorDown = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
+                    ColorSqueeze = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
                     Lenght = Convert.ToInt32(reader.ReadLine());
-                    SqueezePeriod = Convert.ToDecimal(reader.ReadLine());
                     Deviation = Convert.ToDecimal(reader.ReadLine());
+                    SqueezePeriod = Convert.ToDecimal(reader.ReadLine());
                     PaintOn = Convert.ToBoolean(reader.ReadLine());
                     reader.Close();
                 }
@@ -224,12 +228,12 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + Name + @".txt", false))
                 {
-                    writer.WriteLine(ColorSqueeze.ToArgb());
                     writer.WriteLine(ColorUp.ToArgb());
                     writer.WriteLine(ColorDown.ToArgb());
+                    writer.WriteLine(ColorSqueeze.ToArgb());
                     writer.WriteLine(Lenght);
-                    writer.WriteLine(SqueezePeriod);
                     writer.WriteLine(Deviation);
+                    writer.WriteLine(SqueezePeriod);
                     writer.WriteLine(PaintOn);
                     writer.Close();
                 }
@@ -263,6 +267,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesUp.Clear();
                 ValuesDown.Clear();
+                ValuesSqueeze.Clear();
             }
             _myCandles = null;
         }
@@ -349,11 +354,13 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesUp = new List<decimal>();
                 ValuesDown = new List<decimal>();
+                ValuesSqueeze = new List<decimal>();
 
                 decimal[] value = GetValueSimple(candles, candles.Count - 1);
 
                 ValuesUp.Add(value[0]);
                 ValuesDown.Add(value[1]);
+                ValuesSqueeze.Add(value[2]);
             }
             else
             {
@@ -361,6 +368,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
                 ValuesUp.Add(value[0]);
                 ValuesDown.Add(value[1]);
+                ValuesSqueeze.Add(value[2]);
             }
         }
 
@@ -376,6 +384,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             }
             ValuesUp = new List<decimal>();
             ValuesDown = new List<decimal>();
+            ValuesSqueeze = new List<decimal>();
 
             decimal[][] newValues = new decimal[candles.Count][];
 
@@ -393,6 +402,11 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesDown.Add(newValues[i][1]);
             }
+
+            for (int i = 0; i < candles.Count; i++)
+            {
+                ValuesSqueeze.Add(newValues[i][2]);
+            }
         }
 
         /// <summary>
@@ -408,6 +422,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             decimal[] value = GetValueSimple(candles, candles.Count - 1);
             ValuesUp[ValuesUp.Count - 1] = value[0];
             ValuesDown[ValuesDown.Count - 1] = value[1];
+            ValuesSqueeze[ValuesSqueeze.Count - 1] = value[2];
         }
 
         /// <summary>
