@@ -741,6 +741,10 @@
     <Compile Include="Charts\CandleChart\Indicators\BollingerUi.xaml.cs">
       <DependentUpon>BollingerUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Charts\CandleChart\Indicators\BollingerWithSqueeze.cs" />
+    <Compile Include="Charts\CandleChart\Indicators\BollingerWithSqueezeUi.xaml.cs">
+      <DependentUpon>BollingerWithSqueezeUi.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Charts\CandleChart\Indicators\Fractail.cs" />
     <Compile Include="Charts\CandleChart\Indicators\FractalUi.xaml.cs">
       <DependentUpon>FractalUi.xaml</DependentUpon>
@@ -1309,6 +1313,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Charts\CandleChart\Indicators\BollingerUi.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Charts\CandleChart\Indicators\BollingerWithSqueezeUi.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

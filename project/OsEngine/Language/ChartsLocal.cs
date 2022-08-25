@@ -31,6 +31,10 @@ namespace OsEngine.Language
             "Eng:Color_" +
             "Ru:Цвет_");
 
+        public string LabelButtonIndicatorColorSqueeze => OsLocalization.ConvertToLocString(
+            "Eng:Color Squeeze_" +
+            "Ru:Цвет сужения_");
+
         public string LabelButtonIndicatorColorUp => OsLocalization.ConvertToLocString(
             "Eng:Color Up_" +
             "Ru:Цвет верхней_");
