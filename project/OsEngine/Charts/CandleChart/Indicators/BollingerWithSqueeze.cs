@@ -61,7 +61,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 List<List<decimal>> list = new List<List<decimal>>();
                 list.Add(ValuesUp);
                 list.Add(ValuesDown);
-                list.Add(ValuesSqueeze);
+                list.Add(ValuesBandsWidth);
                 return list;
             }
         }
@@ -128,7 +128,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// squeeze of bollinger
         /// сужения линий боллинджера
         /// </summary>
-        public List<decimal> ValuesSqueeze
+        public List<decimal> ValuesBandsWidth
         { get; set; }
 
         /// <summary>
@@ -267,7 +267,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesUp.Clear();
                 ValuesDown.Clear();
-                ValuesSqueeze.Clear();
+                ValuesBandsWidth.Clear();
             }
             _myCandles = null;
         }
@@ -354,13 +354,13 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesUp = new List<decimal>();
                 ValuesDown = new List<decimal>();
-                ValuesSqueeze = new List<decimal>();
+                ValuesBandsWidth = new List<decimal>();
 
                 decimal[] value = GetValueSimple(candles, candles.Count - 1);
 
                 ValuesUp.Add(value[0]);
                 ValuesDown.Add(value[1]);
-                ValuesSqueeze.Add(value[2]);
+                ValuesBandsWidth.Add(value[2]);
             }
             else
             {
@@ -368,7 +368,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
                 ValuesUp.Add(value[0]);
                 ValuesDown.Add(value[1]);
-                ValuesSqueeze.Add(value[2]);
+                ValuesBandsWidth.Add(value[2]);
             }
         }
 
@@ -384,7 +384,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             }
             ValuesUp = new List<decimal>();
             ValuesDown = new List<decimal>();
-            ValuesSqueeze = new List<decimal>();
+            ValuesBandsWidth = new List<decimal>();
 
             decimal[][] newValues = new decimal[candles.Count][];
 
@@ -405,7 +405,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
             for (int i = 0; i < candles.Count; i++)
             {
-                ValuesSqueeze.Add(newValues[i][2]);
+                ValuesBandsWidth.Add(newValues[i][2]);
             }
         }
 
@@ -422,7 +422,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             decimal[] value = GetValueSimple(candles, candles.Count - 1);
             ValuesUp[ValuesUp.Count - 1] = value[0];
             ValuesDown[ValuesDown.Count - 1] = value[1];
-            ValuesSqueeze[ValuesSqueeze.Count - 1] = value[2];
+            ValuesBandsWidth[ValuesBandsWidth.Count - 1] = value[2];
         }
 
         /// <summary>
@@ -496,6 +496,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
             bollinger[0] = Math.Round(valueSma + Convert.ToDecimal(summ) * Deviation, 6);
 
             bollinger[1] = Math.Round(valueSma - Convert.ToDecimal(summ) * Deviation, 6);
+
+            bollinger[2] = valueSma != 0 ? Math.Round((bollinger[0] - bollinger[1]) / valueSma, 6) : 0;
 
             return bollinger;
         }
