@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 
 namespace OsEngine.Charts.CandleChart.Indicators
 {
@@ -62,6 +63,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 list.Add(ValuesUp);
                 list.Add(ValuesDown);
                 list.Add(ValuesBandsWidth);
+                list.Add(ValuesSqueezeFlag);
                 return list;
             }
         }
@@ -125,10 +127,17 @@ namespace OsEngine.Charts.CandleChart.Indicators
         { get; set; }
 
         /// <summary>
+        /// bollinger bands withs
+        /// ширина канала боллинджера
+        /// </summary>
+        public List<decimal> ValuesBandsWidth
+        { get; set; }
+
+        /// <summary>
         /// squeeze of bollinger
         /// сужения линий боллинджера
         /// </summary>
-        public List<decimal> ValuesBandsWidth
+        public List<decimal> ValuesSqueezeFlag
         { get; set; }
 
         /// <summary>
@@ -156,7 +165,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// squeeze period length to calculate indicator
         /// длина расчёта индикатора сужения
         /// </summary>
-        public decimal SqueezePeriod
+        public int SqueezePeriod
         { get; set; }
 
         /// <summary>
@@ -268,6 +277,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 ValuesUp.Clear();
                 ValuesDown.Clear();
                 ValuesBandsWidth.Clear();
+                ValuesSqueezeFlag.Clear();
             }
             _myCandles = null;
         }
@@ -350,26 +360,20 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 return;
             }
+
             if (ValuesDown == null)
             {
                 ValuesUp = new List<decimal>();
                 ValuesDown = new List<decimal>();
                 ValuesBandsWidth = new List<decimal>();
-
-                decimal[] value = GetValueSimple(candles, candles.Count - 1);
-
-                ValuesUp.Add(value[0]);
-                ValuesDown.Add(value[1]);
-                ValuesBandsWidth.Add(value[2]);
+                ValuesSqueezeFlag = new List<decimal>();
             }
-            else
-            {
-                decimal[] value = GetValueSimple(candles, candles.Count - 1);
 
-                ValuesUp.Add(value[0]);
-                ValuesDown.Add(value[1]);
-                ValuesBandsWidth.Add(value[2]);
-            }
+            decimal[] value = GetValueSimple(candles, candles.Count - 1);
+            ValuesUp.Add(value[0]);
+            ValuesDown.Add(value[1]);
+            ValuesBandsWidth.Add(value[2]);
+            ValuesSqueezeFlag.Add(value[3]);
         }
 
         /// <summary>
@@ -385,6 +389,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp = new List<decimal>();
             ValuesDown = new List<decimal>();
             ValuesBandsWidth = new List<decimal>();
+            ValuesSqueezeFlag = new List<decimal>();
 
             decimal[][] newValues = new decimal[candles.Count][];
 
@@ -407,6 +412,11 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesBandsWidth.Add(newValues[i][2]);
             }
+
+            for (int i = 0; i < candles.Count; i++)
+            {
+                ValuesSqueezeFlag.Add(newValues[i][3]);
+            }
         }
 
         /// <summary>
@@ -423,6 +433,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp[ValuesUp.Count - 1] = value[0];
             ValuesDown[ValuesDown.Count - 1] = value[1];
             ValuesBandsWidth[ValuesBandsWidth.Count - 1] = value[2];
+            ValuesSqueezeFlag[ValuesSqueezeFlag.Count - 1] = value[3];
         }
 
         /// <summary>
@@ -499,7 +510,22 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
             bollinger[2] = valueSma != 0 ? Math.Round((bollinger[0] - bollinger[1]) / valueSma, 6) : 0;
 
+            bollinger[3] = IsSqueezeFound(index, bollinger[2]) ? 1 : 0;
+
             return bollinger;
+        }
+
+        private bool IsSqueezeFound(int candleIndex, decimal currentWidth)
+        {
+            bool squeezeFound = false;
+            int rangeStartIndex = candleIndex - SqueezePeriod + 1;
+            bool squeezeCalculatable = ValuesBandsWidth != null && rangeStartIndex >= 0;
+            if (squeezeCalculatable)
+            {
+                decimal minWidth = ValuesBandsWidth.GetRange(rangeStartIndex, SqueezePeriod).Min();
+                squeezeFound = currentWidth == minWidth;
+            }
+            return squeezeFound;
         }
     }
 }
