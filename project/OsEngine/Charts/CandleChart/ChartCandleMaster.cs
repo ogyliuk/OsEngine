@@ -181,6 +181,10 @@ namespace OsEngine.Charts.CandleChart
                         {
                             CreateIndicator(new Bollinger(indicator[1], Convert.ToBoolean(indicator[3])), indicator[2]);
                         }
+                        if (indicator[0] == "BollingerWithSqueeze")
+                        {
+                            CreateIndicator(new BollingerWithSqueeze(indicator[1], Convert.ToBoolean(indicator[3])), indicator[2]);
+                        }
                         if (indicator[0] == "Fractal")
                         {
                             CreateIndicator(new Fractal(indicator[1], Convert.ToBoolean(indicator[3])), indicator[2]);

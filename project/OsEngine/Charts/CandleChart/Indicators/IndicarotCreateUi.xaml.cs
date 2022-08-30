@@ -70,6 +70,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             _gridViewIndicators.Rows.Add("AC");
             _gridViewIndicators.Rows.Add("AccumulationDistribution");
             _gridViewIndicators.Rows.Add("Bollinger");
+            _gridViewIndicators.Rows.Add("BollingerWithSqueeze");
             _gridViewIndicators.Rows.Add("BFMFI");
             _gridViewIndicators.Rows.Add("BullsPower");
             _gridViewIndicators.Rows.Add("BearsPower");
@@ -316,6 +317,21 @@ namespace OsEngine.Charts.CandleChart.Indicators
                     }
                 }
                 IndicatorCandle = new Bollinger(_chartMaster.Name + name, true);
+                _chartMaster.CreateIndicator(IndicatorCandle, areaName);
+            }
+            if (_gridViewIndicators.SelectedCells[0].Value.ToString() == "BollingerWithSqueeze")
+            {
+                string name = "";
+
+                for (int i = 0; i < 30; i++)
+                {
+                    if (_chartMaster.IndicatorIsCreate(_chartMaster.Name + "BollingerWithSqueeze" + i) == false)
+                    {
+                        name = "BollingerWithSqueeze" + i;
+                        break;
+                    }
+                }
+                IndicatorCandle = new BollingerWithSqueeze(_chartMaster.Name + name, true);
                 _chartMaster.CreateIndicator(IndicatorCandle, areaName);
             }
 

@@ -62,8 +62,6 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 List<List<decimal>> list = new List<List<decimal>>();
                 list.Add(ValuesUp);
                 list.Add(ValuesDown);
-                list.Add(ValuesBandsWidth);
-                list.Add(ValuesSqueezeFlag);
                 return list;
             }
         }
@@ -442,10 +440,10 @@ namespace OsEngine.Charts.CandleChart.Indicators
         {
             if (index - Lenght <= 0)
             {
-                return new decimal[2];
+                return new decimal[3];
             }
 
-            decimal[] bollinger = new decimal[2];
+            decimal[] bollinger = new decimal[3];
             // 1 count SMA
             // 1 считаем СМА
 
@@ -503,9 +501,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             // 3 считаем линии боллинжера
 
             bollinger[0] = Math.Round(valueSma + Convert.ToDecimal(summ) * Deviation, 6);
-
             bollinger[1] = Math.Round(valueSma - Convert.ToDecimal(summ) * Deviation, 6);
-
             bollinger[2] = valueSma != 0 ? Math.Round((bollinger[0] - bollinger[1]) / valueSma, 6) : 0;
 
             return bollinger;
