@@ -1,4 +1,5 @@
-﻿using OsEngine.Entity;
+﻿using OsEngine.Charts.CandleChart.Indicators;
+using OsEngine.Entity;
 using OsEngine.Indicators;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Attributes;
@@ -14,10 +15,12 @@ namespace OsEngine.Robots.Oleg.Good
     {
         private BotTabSimple _tab;
         
-        private Aindicator _bollinger;
+        private Bollinger _bollinger;
+        private BollingerWithSqueeze _bollingerWithSqueeze;
 
         private StrategyParameterInt BollingerLength;
         private StrategyParameterDecimal BollingerDeviation;
+        private StrategyParameterInt BollingerSqueezeLength;
 
         private StrategyParameterString Regime;
         private StrategyParameterDecimal VolumeFirstEntry;
@@ -40,16 +43,24 @@ namespace OsEngine.Robots.Oleg.Good
 
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
+            BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
 
             RecoveryZoneSizePercents = CreateParameter("Recovery zone size %", 0.3m, 0.1m, 1, 0.05m, "Base");
             LongProfitSizePercents = CreateParameter("Long profit size %", 0.1m, 0.1m, 1, 0.05m, "Base");
             ShortProfitSizePercents = CreateParameter("Short profit size %", 0.1m, 0.1m, 1, 0.05m, "Base");
 
-            _bollinger = IndicatorsFactory.CreateIndicatorByName(nameClass: "Bollinger", name: name + "Bollinger", canDelete: false);
-            _bollinger = (Aindicator)_tab.CreateCandleIndicator(_bollinger, nameArea: "Prime");
-            _bollinger.ParametersDigit[0].Value = BollingerLength.ValueInt;
-            _bollinger.ParametersDigit[1].Value = BollingerDeviation.ValueDecimal;
+            _bollinger = new Bollinger(name + "Bollinger", false);
+            _bollinger = (Bollinger)_tab.CreateCandleIndicator(_bollinger, "Prime");
+            _bollinger.Lenght = BollingerLength.ValueInt;
+            _bollinger.Deviation = BollingerDeviation.ValueDecimal;
             _bollinger.Save();
+
+            _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
+            _bollingerWithSqueeze = (BollingerWithSqueeze)_tab.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
+            _bollingerWithSqueeze.Lenght = BollingerLength.ValueInt;
+            _bollingerWithSqueeze.Deviation = BollingerDeviation.ValueDecimal;
+            _bollingerWithSqueeze.SqueezePeriod = BollingerSqueezeLength.ValueInt;
+            _bollingerWithSqueeze.Save();
 
             _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
             _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler;
@@ -60,13 +71,24 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void ParametersChangeByUserEventHandler()
         {
-            if (_bollinger.ParametersDigit[0].Value != BollingerLength.ValueInt || 
-                _bollinger.ParametersDigit[1].Value != BollingerDeviation.ValueDecimal)
+            if (_bollinger.Lenght != BollingerLength.ValueInt || 
+                _bollinger.Deviation != BollingerDeviation.ValueDecimal)
             {
-                _bollinger.ParametersDigit[0].Value = BollingerLength.ValueInt;
-                _bollinger.ParametersDigit[1].Value = BollingerDeviation.ValueDecimal;
+                _bollinger.Lenght = BollingerLength.ValueInt;
+                _bollinger.Deviation = BollingerDeviation.ValueDecimal;
                 _bollinger.Reload();
                 _bollinger.Save();
+            }
+
+            if (_bollingerWithSqueeze.Lenght != BollingerLength.ValueInt ||
+                _bollingerWithSqueeze.Deviation != BollingerDeviation.ValueDecimal ||
+                _bollingerWithSqueeze.SqueezePeriod != BollingerSqueezeLength.ValueInt)
+            {
+                _bollingerWithSqueeze.Lenght = BollingerLength.ValueInt;
+                _bollingerWithSqueeze.Deviation = BollingerDeviation.ValueDecimal;
+                _bollingerWithSqueeze.SqueezePeriod = BollingerSqueezeLength.ValueInt;
+                _bollingerWithSqueeze.Reload();
+                _bollingerWithSqueeze.Save();
             }
         }
 
@@ -94,7 +116,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (_tab.PositionsOpenAll.Count == 0)
             {
-                if (candles.Last().Close > _bollinger.DataSeries[0].Last)
+                if (candles.Last().Close > _bollinger.ValuesUp.Last())
                 {
                     _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
                 }
