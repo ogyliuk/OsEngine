@@ -19,8 +19,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public BollingerWithSqueeze(string uniqName, bool canDelete)
         {
             Name = uniqName;
-            TypeIndicator = IndicatorChartPaintType.Line;
-            ColorSqueeze = Color.Brown;
+            TypeIndicator = IndicatorChartPaintType.Column;
+            ColorSqueeze = Color.White;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
             Lenght = 20;
@@ -40,8 +40,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public BollingerWithSqueeze(bool canDelete)
         {
             Name = Guid.NewGuid().ToString();
-            TypeIndicator = IndicatorChartPaintType.Line;
-            ColorSqueeze = Color.Brown;
+            TypeIndicator = IndicatorChartPaintType.Column;
+            ColorSqueeze = Color.White;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
             Lenght = 20;
@@ -60,8 +60,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             get
             {
                 List<List<decimal>> list = new List<List<decimal>>();
-                list.Add(ValuesUp);
-                list.Add(ValuesDown);
+                list.Add(ValuesSqueezeFlag);
                 return list;
             }
         }
@@ -75,8 +74,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             get
             {
                 List<Color> colors = new List<Color>();
-                colors.Add(ColorUp);
-                colors.Add(ColorDown);
+                colors.Add(ColorSqueeze);
                 colors.Add(ColorSqueeze);
                 return colors;
             }
@@ -369,7 +367,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp.Add(value[0]);
             ValuesDown.Add(value[1]);
             ValuesBandsWidth.Add(value[2]);
-            ValuesSqueezeFlag.Add(IsSqueezeCandle(candles.Count - 1) ? 1 : 0);
+            decimal squeezeColumnUpperPoint = candles.Last().Low < ValuesDown.Last() ? candles.Last().Low : ValuesDown.Last();
+            ValuesSqueezeFlag.Add(IsSqueezeCandle(candles.Count - 1) ? squeezeColumnUpperPoint : 0);
         }
 
         /// <summary>
@@ -411,7 +410,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
             for (int i = 0; i < candles.Count; i++)
             {
-                ValuesSqueezeFlag.Add(IsSqueezeCandle(i) ? 1 : 0);
+                decimal squeezeColumnUpperPoint = candles[i].Low < ValuesDown[i] ? candles[i].Low : ValuesDown[i];
+                ValuesSqueezeFlag.Add(IsSqueezeCandle(i) ? squeezeColumnUpperPoint : 0);
             }
         }
 
@@ -429,7 +429,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp[ValuesUp.Count - 1] = value[0];
             ValuesDown[ValuesDown.Count - 1] = value[1];
             ValuesBandsWidth[ValuesBandsWidth.Count - 1] = value[2];
-            ValuesSqueezeFlag[ValuesSqueezeFlag.Count - 1] = IsSqueezeCandle(candles.Count - 1) ? 1 : 0;
+            decimal squeezeColumnUpperPoint = candles.Last().Low < ValuesDown.Last() ? candles.Last().Low : ValuesDown.Last();
+            ValuesSqueezeFlag[ValuesSqueezeFlag.Count - 1] = IsSqueezeCandle(candles.Count - 1) ? squeezeColumnUpperPoint : 0;
         }
 
         /// <summary>
