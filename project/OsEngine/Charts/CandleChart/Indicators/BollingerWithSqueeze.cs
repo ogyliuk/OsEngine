@@ -322,13 +322,11 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public void Process(List<Candle> candles)
         {
             _myCandles = candles;
-            if (ValuesDown != null &&
-                ValuesDown.Count + 1 == candles.Count)
+            if (ValuesDown != null && ValuesDown.Count + 1 == candles.Count)
             {
                 ProcessOne(candles);
             }
-            else if (ValuesDown != null &&
-                ValuesDown.Count == candles.Count)
+            else if (ValuesDown != null && ValuesDown.Count == candles.Count)
             {
                 ProcessLast(candles);
             }
@@ -336,7 +334,6 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ProcessAll(candles);
             }
-            // TODO : calc squeeze here
         }
 
         /// <summary>
@@ -374,6 +371,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp.Add(value[0]);
             ValuesDown.Add(value[1]);
             ValuesBandsWidth.Add(value[2]);
+            ValuesSqueezeFlag.Add(IsSqueezeCandle(candles.Count - 1) ? 1 : 0);
         }
 
         /// <summary>
@@ -412,6 +410,11 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesBandsWidth.Add(newValues[i][2]);
             }
+
+            for (int i = 0; i < candles.Count; i++)
+            {
+                ValuesSqueezeFlag.Add(IsSqueezeCandle(i) ? 1 : 0);
+            }
         }
 
         /// <summary>
@@ -428,6 +431,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp[ValuesUp.Count - 1] = value[0];
             ValuesDown[ValuesDown.Count - 1] = value[1];
             ValuesBandsWidth[ValuesBandsWidth.Count - 1] = value[2];
+            ValuesSqueezeFlag[ValuesSqueezeFlag.Count - 1] = IsSqueezeCandle(candles.Count - 1) ? 1 : 0;
         }
 
         /// <summary>
@@ -507,7 +511,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             return bollinger;
         }
 
-        private bool IsSqueezeFound(int candleIndex)
+        private bool IsSqueezeCandle(int candleIndex)
         {
             bool squeezeFound = false;
             int rangeStartIndex = candleIndex - SqueezePeriod + 1;
