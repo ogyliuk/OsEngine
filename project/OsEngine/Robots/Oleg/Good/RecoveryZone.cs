@@ -13,6 +13,7 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("RecoveryZone")]
     public class RecoveryZone : BotPanel
     {
+        private TradingState _state;
         private BotTabSimple _tab;
         
         private Bollinger _bollinger;
@@ -35,6 +36,7 @@ namespace OsEngine.Robots.Oleg.Good
         {
             TabCreate(BotTabType.Simple);
             _tab = TabsSimple[0];
+            _state = TradingState.FREE;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On", "OnlyLong", "OnlyShort", "OnlyClosePosition" }, "Base");
             VolumeMode = CreateParameter("Volume type", "Number of contracts", new[] { "Number of contracts", "Contract currency", "% of the total portfolio" }, "Base");
@@ -165,6 +167,12 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 return Math.Round(_tab.Portfolio.ValueCurrent * (volume / 100) / _tab.PriceBestAsk / _tab.Securiti.Lot, VolumeDecimals.ValueInt);
             }
+        }
+
+        enum TradingState
+        {
+            FREE,
+            SQUEEZE_FOUND
         }
     }
 }
