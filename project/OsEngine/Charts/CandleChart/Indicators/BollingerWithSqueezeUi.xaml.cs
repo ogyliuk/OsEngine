@@ -87,7 +87,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             _bollingerWithSqueeze.ColorSqueeze = HostColorSqueeze.Child.BackColor;
             _bollingerWithSqueeze.ColorUp = HostColorUp.Child.BackColor;
             _bollingerWithSqueeze.ColorDown = HostColorDown.Child.BackColor;
-            _bollingerWithSqueeze.SqueezePeriod = Convert.ToDecimal(TextBoxSqueezeLenght.Text);
+            _bollingerWithSqueeze.SqueezePeriod = Convert.ToInt32(TextBoxSqueezeLenght.Text);
             _bollingerWithSqueeze.Deviation = Convert.ToDecimal(TextBoxDeviation.Text);
             _bollingerWithSqueeze.Lenght = Convert.ToInt32(TextBoxLenght.Text);
 

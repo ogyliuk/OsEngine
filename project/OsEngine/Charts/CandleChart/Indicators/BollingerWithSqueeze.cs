@@ -215,7 +215,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
                     ColorSqueeze = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
                     Lenght = Convert.ToInt32(reader.ReadLine());
                     Deviation = Convert.ToDecimal(reader.ReadLine());
-                    SqueezePeriod = Convert.ToDecimal(reader.ReadLine());
+                    SqueezePeriod = Convert.ToInt32(reader.ReadLine());
                     PaintOn = Convert.ToBoolean(reader.ReadLine());
                     reader.Close();
                 }
@@ -336,6 +336,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ProcessAll(candles);
             }
+            // TODO : calc squeeze here
         }
 
         /// <summary>
@@ -373,7 +374,6 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp.Add(value[0]);
             ValuesDown.Add(value[1]);
             ValuesBandsWidth.Add(value[2]);
-            ValuesSqueezeFlag.Add(value[3]);
         }
 
         /// <summary>
@@ -412,11 +412,6 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesBandsWidth.Add(newValues[i][2]);
             }
-
-            for (int i = 0; i < candles.Count; i++)
-            {
-                ValuesSqueezeFlag.Add(newValues[i][3]);
-            }
         }
 
         /// <summary>
@@ -433,7 +428,6 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ValuesUp[ValuesUp.Count - 1] = value[0];
             ValuesDown[ValuesDown.Count - 1] = value[1];
             ValuesBandsWidth[ValuesBandsWidth.Count - 1] = value[2];
-            ValuesSqueezeFlag[ValuesSqueezeFlag.Count - 1] = value[3];
         }
 
         /// <summary>
@@ -510,18 +504,17 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
             bollinger[2] = valueSma != 0 ? Math.Round((bollinger[0] - bollinger[1]) / valueSma, 6) : 0;
 
-            bollinger[3] = IsSqueezeFound(index, bollinger[2]) ? 1 : 0;
-
             return bollinger;
         }
 
-        private bool IsSqueezeFound(int candleIndex, decimal currentWidth)
+        private bool IsSqueezeFound(int candleIndex)
         {
             bool squeezeFound = false;
             int rangeStartIndex = candleIndex - SqueezePeriod + 1;
             bool squeezeCalculatable = ValuesBandsWidth != null && rangeStartIndex >= 0;
             if (squeezeCalculatable)
             {
+                decimal currentWidth = ValuesBandsWidth[candleIndex];
                 decimal minWidth = ValuesBandsWidth.GetRange(rangeStartIndex, SqueezePeriod).Min();
                 squeezeFound = currentWidth == minWidth;
             }
