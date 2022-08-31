@@ -15,7 +15,8 @@ namespace OsEngine.Robots.Oleg.Good
     {
         private TradingState _state;
         private BotTabSimple _tab;
-        
+
+        private MovingAverage _bollingerSma;
         private Bollinger _bollinger;
         private BollingerWithSqueeze _bollingerWithSqueeze;
 
@@ -51,6 +52,12 @@ namespace OsEngine.Robots.Oleg.Good
             LongProfitSizePercents = CreateParameter("Long profit size %", 0.1m, 0.1m, 1, 0.05m, "Base");
             ShortProfitSizePercents = CreateParameter("Short profit size %", 0.1m, 0.1m, 1, 0.05m, "Base");
 
+            _bollingerSma = new MovingAverage(false);
+            _bollingerSma = (MovingAverage)_tab.CreateCandleIndicator(_bollingerSma, "Prime");
+            _bollingerSma.TypeCalculationAverage = MovingAverageTypeCalculation.Simple;
+            _bollingerSma.Lenght = BollingerLength.ValueInt;
+            _bollingerSma.Save();
+
             _bollinger = new Bollinger(name + "Bollinger", false);
             _bollinger = (Bollinger)_tab.CreateCandleIndicator(_bollinger, "Prime");
             _bollinger.Lenght = BollingerLength.ValueInt;
@@ -75,6 +82,13 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void ParametersChangeByUserEventHandler()
         {
+            if (_bollingerSma.Lenght != BollingerLength.ValueInt)
+            {
+                _bollingerSma.Lenght = BollingerLength.ValueInt;
+                _bollingerSma.Reload();
+                _bollingerSma.Save();
+            }
+
             if (_bollinger.Lenght != BollingerLength.ValueInt || 
                 _bollinger.Deviation != BollingerDeviation.ValueDecimal)
             {
@@ -145,12 +159,12 @@ namespace OsEngine.Robots.Oleg.Good
                         .Where(p => p.State == PositionStateType.Open && p.Direction == Side.Buy).FirstOrDefault();
                     if (longPosition != null)
                     {
-                        decimal bollingerSmaPrice = (_bollinger.ValuesUp.Last() - _bollinger.ValuesDown.Last()) / 2;
-                        decimal SL_price = bollingerSmaPrice;
+                        decimal SL_price = _bollingerSma.Values.Last();
                         decimal SL_size = longPosition.EntryPrice - SL_price;
                         decimal TP_price = longPosition.EntryPrice + SL_size * 2;
-                        _tab.CloseAtLimit(longPosition, TP_price, longPosition.OpenVolume);
+                        _tab.CloseAtProfit(longPosition, TP_price, longPosition.OpenVolume);
                         _tab.CloseAtStop(longPosition, SL_price, SL_price);
+                        _state = TradingState.LONG_TARGETS_SET;
                     }
                 }
 
@@ -160,12 +174,12 @@ namespace OsEngine.Robots.Oleg.Good
                         .Where(p => p.State == PositionStateType.Open && p.Direction == Side.Sell).FirstOrDefault();
                     if (shortPosition != null)
                     {
-                        decimal bollingerSmaPrice = (_bollinger.ValuesUp.Last() - _bollinger.ValuesDown.Last()) / 2;
-                        decimal SL_price = bollingerSmaPrice;
+                        decimal SL_price = _bollingerSma.Values.Last();
                         decimal SL_size = SL_price - shortPosition.EntryPrice;
                         decimal TP_price = shortPosition.EntryPrice - SL_size * 2;
-                        _tab.CloseAtLimit(shortPosition, TP_price, shortPosition.OpenVolume);
+                        _tab.CloseAtProfit(shortPosition, TP_price, shortPosition.OpenVolume);
                         _tab.CloseAtStop(shortPosition, SL_price, SL_price);
+                        _state = TradingState.SHORT_TARGETS_SET;
                     }
                 }
             }
@@ -235,7 +249,9 @@ namespace OsEngine.Robots.Oleg.Good
             FREE,
             SQUEEZE_FOUND,
             LONG_ENTERED,
-            SHORT_ENTERED
+            SHORT_ENTERED,
+            LONG_TARGETS_SET,
+            SHORT_TARGETS_SET
         }
     }
 }
