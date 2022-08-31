@@ -133,8 +133,8 @@ namespace OsEngine.Robots.Oleg.Good
                 decimal semiSqueezeVolatility = (_bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last()) / 2;
                 decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
                 decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
-                _tab.BuyAtStop(VolumeFirstEntry.ValueDecimal, longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
-                _tab.SellAtStop(VolumeFirstEntry.ValueDecimal, shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
+                _tab.BuyAtStop(GetVolume(), longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
+                _tab.SellAtStop(GetVolume(), shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
             }
         }
 
@@ -145,13 +145,7 @@ namespace OsEngine.Robots.Oleg.Good
                 return;
             }
 
-            if (_tab.PositionsOpenAll.Count == 0)
-            {
-                // _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
-                // _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
-                // _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
-            }
-            else
+            if (_tab.PositionsOpenAll.Count > 0)
             {
                 if (_state == TradingState.LONG_ENTERED)
                 {
@@ -205,9 +199,8 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void _tab_PositionCloseEventHandler(Position position)
         {
-            if (position != null)
+            if (position != null && position.State == PositionStateType.Done)
             {
-                // TODO : check state -  position.State == PositionStateType.Closing or Done ?
                 _state = TradingState.FREE;
             }
         }
