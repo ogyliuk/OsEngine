@@ -64,8 +64,9 @@ namespace OsEngine.Robots.Oleg.Good
             _bollingerWithSqueeze.SqueezePeriod = BollingerSqueezeLength.ValueInt;
             _bollingerWithSqueeze.Save();
 
-            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
+            _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
             _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler;
+            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
 
             ParametrsChangeByUser += ParametersChangeByUserEventHandler;
             ParametersChangeByUserEventHandler();
@@ -101,17 +102,30 @@ namespace OsEngine.Robots.Oleg.Good
 
         public override void ShowIndividualSettingsDialog() { }
 
+        private void _tab_CandleFinishedEventHandler(List<Candle> candles)
+        {
+            if (!ReadyForTrading())
+            {
+                return;
+            }
+
+            bool noPositions = _tab.PositionsOpenAll.Count == 0;
+            bool freeState = _state == TradingState.FREE;
+            bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
+            if (noPositions && freeState && lastCandleHasSqueeze)
+            {
+                _state = TradingState.SQUEEZE_FOUND;
+                decimal semiSqueezeVolatility = (_bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last()) / 2;
+                decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
+                decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
+                _tab.BuyAtStop(VolumeFirstEntry.ValueDecimal, longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual);
+                _tab.SellAtStop(VolumeFirstEntry.ValueDecimal, shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal);
+            }
+        }
+
         private void _tab_CandleUpdateEventHandler(List<Candle> candles)
         {
-            if (Regime.ValueString == "Off")
-            {
-                return;
-            }
-            if (_tab.CandlesAll == null)
-            {
-                return;
-            }
-            if (BollingerLength.ValueInt >= _tab.CandlesAll.Count)
+            if (!ReadyForTrading())
             {
                 return;
             }
@@ -120,7 +134,7 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 if (candles.Last().Close > _bollinger.ValuesUp.Last())
                 {
-                    _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
+                    //_tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
                 }
 
                 // _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
@@ -144,9 +158,21 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 decimal takeProfitPrice = position.EntryPrice * (100 + LongProfitSizePercents.ValueDecimal) / 100;
                 decimal stopLossPrice = position.EntryPrice * (100 - RecoveryZoneSizePercents.ValueDecimal) / 100;
-                _tab.CloseAtLimit(position, takeProfitPrice, position.OpenVolume);
-                _tab.CloseAtStop(position, stopLossPrice, stopLossPrice);
+                // _tab.CloseAtLimit(position, takeProfitPrice, position.OpenVolume);
+                // _tab.CloseAtStop(position, stopLossPrice, stopLossPrice);
             }
+        }
+
+        private bool ReadyForTrading()
+        {
+            if (Regime.ValueString == "Off" ||
+                _tab.CandlesAll == null ||
+                BollingerLength.ValueInt >= _tab.CandlesAll.Count ||
+                BollingerSqueezeLength.ValueInt >= _tab.CandlesAll.Count)
+            {
+                return false;
+            }
+            return true;
         }
 
         private decimal GetVolume()
