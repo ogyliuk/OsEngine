@@ -67,6 +67,7 @@ namespace OsEngine.Robots.Oleg.Good
             _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
             _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler;
             _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
+            _tab.PositionClosingSuccesEvent += _tab_PositionCloseEventHandler;
 
             ParametrsChangeByUser += ParametersChangeByUserEventHandler;
             ParametersChangeByUserEventHandler();
@@ -132,21 +133,39 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (_tab.PositionsOpenAll.Count == 0)
             {
-                if (candles.Last().Close > _bollinger.ValuesUp.Last())
-                {
-                    //_tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
-                }
-
+                //_tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
                 // _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
                 // _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
             }
             else
             {
-                foreach (Position position in _tab.PositionsOpenAll)
+                if (_state == TradingState.LONG_ENTERED)
                 {
-                    if (position.State == PositionStateType.Open)
+                    Position longPosition = _tab.PositionsOpenAll
+                        .Where(p => p.State == PositionStateType.Open && p.Direction == Side.Buy).FirstOrDefault();
+                    if (longPosition != null)
                     {
-                        // _tab.CloseAtLimit(position, closePrice, position.OpenVolume);
+                        decimal bollingerSmaPrice = (_bollinger.ValuesUp.Last() - _bollinger.ValuesDown.Last()) / 2;
+                        decimal SL_price = bollingerSmaPrice;
+                        decimal SL_size = longPosition.EntryPrice - SL_price;
+                        decimal TP_price = longPosition.EntryPrice + SL_size * 2;
+                        _tab.CloseAtLimit(longPosition, TP_price, longPosition.OpenVolume);
+                        _tab.CloseAtStop(longPosition, SL_price, SL_price);
+                    }
+                }
+
+                if (_state == TradingState.SHORT_ENTERED)
+                {
+                    Position shortPosition = _tab.PositionsOpenAll
+                        .Where(p => p.State == PositionStateType.Open && p.Direction == Side.Sell).FirstOrDefault();
+                    if (shortPosition != null)
+                    {
+                        decimal bollingerSmaPrice = (_bollinger.ValuesUp.Last() - _bollinger.ValuesDown.Last()) / 2;
+                        decimal SL_price = bollingerSmaPrice;
+                        decimal SL_size = SL_price - shortPosition.EntryPrice;
+                        decimal TP_price = shortPosition.EntryPrice - SL_size * 2;
+                        _tab.CloseAtLimit(shortPosition, TP_price, shortPosition.OpenVolume);
+                        _tab.CloseAtStop(shortPosition, SL_price, SL_price);
                     }
                 }
             }
@@ -156,10 +175,25 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (position != null && position.State == PositionStateType.Open)
             {
-                decimal takeProfitPrice = position.EntryPrice * (100 + LongProfitSizePercents.ValueDecimal) / 100;
-                decimal stopLossPrice = position.EntryPrice * (100 - RecoveryZoneSizePercents.ValueDecimal) / 100;
-                // _tab.CloseAtLimit(position, takeProfitPrice, position.OpenVolume);
-                // _tab.CloseAtStop(position, stopLossPrice, stopLossPrice);
+                if (position.Direction == Side.Buy)
+                {
+                    _tab.SellAtStopCancel();
+                    _state = TradingState.LONG_ENTERED;
+                }
+                if (position.Direction == Side.Sell)
+                {
+                    _tab.BuyAtStopCancel();
+                    _state = TradingState.SHORT_ENTERED;
+                }
+            }
+        }
+
+        private void _tab_PositionCloseEventHandler(Position position)
+        {
+            if (position != null)
+            {
+                // TODO : check state -  position.State == PositionStateType.Closing or Done ?
+                _state = TradingState.FREE;
             }
         }
 
@@ -198,7 +232,9 @@ namespace OsEngine.Robots.Oleg.Good
         enum TradingState
         {
             FREE,
-            SQUEEZE_FOUND
+            SQUEEZE_FOUND,
+            LONG_ENTERED,
+            SHORT_ENTERED
         }
     }
 }
