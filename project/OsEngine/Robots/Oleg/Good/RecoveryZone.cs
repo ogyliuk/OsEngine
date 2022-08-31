@@ -119,8 +119,8 @@ namespace OsEngine.Robots.Oleg.Good
                 decimal semiSqueezeVolatility = (_bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last()) / 2;
                 decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
                 decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
-                _tab.BuyAtStop(VolumeFirstEntry.ValueDecimal, longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual);
-                _tab.SellAtStop(VolumeFirstEntry.ValueDecimal, shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal);
+                _tab.BuyAtStop(VolumeFirstEntry.ValueDecimal, longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
+                _tab.SellAtStop(VolumeFirstEntry.ValueDecimal, shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
             }
         }
 
@@ -133,7 +133,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             if (_tab.PositionsOpenAll.Count == 0)
             {
-                //_tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
+                // _tab.BuyAtLimit(VolumeFirstEntry.ValueDecimal, candles.Last().Close);
                 // _tab.BuyAtStop(GetVolume(), lastCandleClosePrice + slippage, lastCandleClosePrice, StopActivateType.HigherOrEqual, 1);
                 // _tab.SellAtStop(GetVolume(), lastCandleClosePrice - slippage, lastCandleClosePrice, StopActivateType.LowerOrEqyal, 1);
             }
@@ -175,14 +175,15 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (position != null && position.State == PositionStateType.Open)
             {
+                _tab.SellAtStopCancel();
+                _tab.BuyAtStopCancel();
+
                 if (position.Direction == Side.Buy)
                 {
-                    _tab.SellAtStopCancel();
                     _state = TradingState.LONG_ENTERED;
                 }
                 if (position.Direction == Side.Sell)
                 {
-                    _tab.BuyAtStopCancel();
                     _state = TradingState.SHORT_ENTERED;
                 }
             }
