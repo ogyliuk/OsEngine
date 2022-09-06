@@ -785,6 +785,8 @@ namespace OsEngine.Market.Connectors
 
         private bool _neadToStopThread;
 
+        private object _myServerLocker = new object();
+
         /// <summary>
         /// subscribe to receive candle
         /// подписаться на получение свечек
@@ -902,7 +904,17 @@ namespace OsEngine.Market.Connectors
                             }
 
                             Thread.Sleep(1);
-                            _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder, _securityClass);
+                            lock (_myServerLocker)
+                            {
+                                if (_myServer != null)
+                                {
+                                    _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder, _securityClass);
+                                }
+                                else
+                                {
+                                    OlegUtils.Log("Boom case happened! Name = {0}; Class = {1}", _securityName, _securityClass);
+                                }
+                            }
 
                             if (_mySeries == null &&
                                 _myServer.ServerType == ServerType.Optimizer &&
