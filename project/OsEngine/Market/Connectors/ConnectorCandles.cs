@@ -908,7 +908,15 @@ namespace OsEngine.Market.Connectors
                             {
                                 if (_myServer != null)
                                 {
-                                    _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder, _securityClass);
+                                    try
+                                    {
+                                        _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder, _securityClass);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        OlegUtils.Log("Still have a PROBLEM! Name = {0}; Class = {1}; Error = {2}", _securityName, _securityClass, ex.Message);
+                                        throw ex;
+                                    }
                                 }
                                 else
                                 {
