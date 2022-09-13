@@ -908,25 +908,15 @@ namespace OsEngine.Market.Connectors
                             {
                                 if (_myServer != null)
                                 {
-                                    try
-                                    {
-                                        _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder, _securityClass);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        OlegUtils.Log("Still have a PROBLEM! Name = {0}; Class = {1}; Error = {2}", _securityName, _securityClass, ex.Message);
-                                        throw ex;
-                                    }
-                                }
-                                else
-                                {
-                                    OlegUtils.Log("Boom case happened! Name = {0}; Class = {1}", _securityName, _securityClass);
+                                    _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder, _securityClass);
                                 }
                             }
 
+                            OptimizerServer myOptimizerServer = _myServer as OptimizerServer;
                             if (_mySeries == null &&
-                                _myServer.ServerType == ServerType.Optimizer &&
-                                ((OptimizerServer)_myServer).NumberServer != ServerUid)
+                                myOptimizerServer != null &&
+                                myOptimizerServer.ServerType == ServerType.Optimizer &&
+                                myOptimizerServer.NumberServer != ServerUid)
                             {
                                 for (int i = 0; i < servers.Count; i++)
                                 {
