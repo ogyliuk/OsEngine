@@ -29,9 +29,9 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterString VolumeMode;
         private StrategyParameterInt VolumeDecimals;
 
-        private StrategyParameterDecimal RecoveryZoneSizePercents;
-        private StrategyParameterDecimal LongProfitSizePercents;
-        private StrategyParameterDecimal ShortProfitSizePercents;
+        // private StrategyParameterDecimal UNUSED_RecoveryZoneSizePercents;
+        private StrategyParameterDecimal LongProfitSizeFromRZ;
+        private StrategyParameterDecimal ShortProfitSizeFromRZ;
 
         public RecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
@@ -48,9 +48,9 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
 
-            RecoveryZoneSizePercents = CreateParameter("Recovery zone size %", 0.3m, 0.1m, 1, 0.05m, "Base");
-            LongProfitSizePercents = CreateParameter("Long profit size %", 0.1m, 0.1m, 1, 0.05m, "Base");
-            ShortProfitSizePercents = CreateParameter("Short profit size %", 0.1m, 0.1m, 1, 0.05m, "Base");
+            // UNUSED_RecoveryZoneSizePercents = CreateParameter("UNUSED Recovery zone size %", 0.3m, 0.1m, 1, 0.05m, "Base");
+            LongProfitSizeFromRZ = CreateParameter("Long profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
+            ShortProfitSizeFromRZ = CreateParameter("UNUSED Short profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
 
             _bollingerSma = new MovingAverage(false);
             _bollingerSma = (MovingAverage)_tab.CreateCandleIndicator(_bollingerSma, "Prime");
@@ -119,33 +119,34 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void _tab_CandleFinishedEventHandler(List<Candle> candles)
         {
-            if (!ReadyForTrading())
+            if (ReadyForTrading())
             {
-                return;
-            }
-
-            bool noPositions = _tab.PositionsOpenAll.Count == 0;
-            bool freeState = _state == TradingState.FREE;
-            bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
-            if (noPositions && freeState && lastCandleHasSqueeze)
-            {
-                _state = TradingState.SQUEEZE_FOUND;
-                decimal semiSqueezeVolatility = (_bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last()) / 2;
-                decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
-                decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
-                _tab.BuyAtStop(GetVolume(), longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
-                _tab.SellAtStop(GetVolume(), shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
+                bool noPositions = _tab.PositionsOpenAll.Count == 0;
+                bool freeState = _state == TradingState.FREE;
+                bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
+                if (noPositions && freeState && lastCandleHasSqueeze)
+                {
+                    _state = TradingState.SQUEEZE_FOUND;
+                    decimal semiSqueezeVolatility = (_bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last()) / 2;
+                    bool longsEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyLong";
+                    if (longsEnabled)
+                    {
+                        decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
+                        _tab.BuyAtStop(GetVolume(), longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
+                    }
+                    bool shortsEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyShort";
+                    if (shortsEnabled)
+                    {
+                        decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
+                        _tab.SellAtStop(GetVolume(), shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
+                    }
+                }
             }
         }
 
         private void _tab_CandleUpdateEventHandler(List<Candle> candles)
         {
-            if (!ReadyForTrading())
-            {
-                return;
-            }
-
-            if (_tab.PositionsOpenAll.Count > 0)
+            if (ReadyForTrading() && _tab.PositionsOpenAll.Count > 0)
             {
                 if (_state == TradingState.LONG_ENTERED)
                 {
@@ -155,7 +156,7 @@ namespace OsEngine.Robots.Oleg.Good
                     {
                         decimal SL_price = _bollingerSma.Values.Last();
                         decimal SL_size = longPosition.EntryPrice - SL_price;
-                        decimal TP_price = longPosition.EntryPrice + SL_size * 2;
+                        decimal TP_price = longPosition.EntryPrice + SL_size * LongProfitSizeFromRZ.ValueDecimal;
                         _tab.CloseAtProfit(longPosition, TP_price, longPosition.OpenVolume);
                         _tab.CloseAtStop(longPosition, SL_price, SL_price);
                         _state = TradingState.LONG_TARGETS_SET;
@@ -170,7 +171,7 @@ namespace OsEngine.Robots.Oleg.Good
                     {
                         decimal SL_price = _bollingerSma.Values.Last();
                         decimal SL_size = SL_price - shortPosition.EntryPrice;
-                        decimal TP_price = shortPosition.EntryPrice - SL_size * 2;
+                        decimal TP_price = shortPosition.EntryPrice - SL_size * LongProfitSizeFromRZ.ValueDecimal; // TODO : use param
                         _tab.CloseAtProfit(shortPosition, TP_price, shortPosition.OpenVolume);
                         _tab.CloseAtStop(shortPosition, SL_price, SL_price);
                         _state = TradingState.SHORT_TARGETS_SET;
