@@ -1,6 +1,5 @@
 ﻿using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Entity;
-using OsEngine.Indicators;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.OsTrader.Panels.Tab;
@@ -29,9 +28,7 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterString VolumeMode;
         private StrategyParameterInt VolumeDecimals;
 
-        // private StrategyParameterDecimal UNUSED_RecoveryZoneSizePercents;
-        private StrategyParameterDecimal LongProfitSizeFromRZ;
-        private StrategyParameterDecimal ShortProfitSizeFromRZ;
+        private StrategyParameterDecimal ProfitSizeFromRZ;
 
         public RecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
@@ -48,9 +45,7 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
 
-            // UNUSED_RecoveryZoneSizePercents = CreateParameter("UNUSED Recovery zone size %", 0.3m, 0.1m, 1, 0.05m, "Base");
-            LongProfitSizeFromRZ = CreateParameter("Long profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
-            ShortProfitSizeFromRZ = CreateParameter("UNUSED Short profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
+            ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
 
             _bollingerSma = new MovingAverage(false);
             _bollingerSma = (MovingAverage)_tab.CreateCandleIndicator(_bollingerSma, "Prime");
@@ -156,7 +151,7 @@ namespace OsEngine.Robots.Oleg.Good
                     {
                         decimal SL_price = _bollingerSma.Values.Last();
                         decimal SL_size = longPosition.EntryPrice - SL_price;
-                        decimal TP_price = longPosition.EntryPrice + SL_size * LongProfitSizeFromRZ.ValueDecimal;
+                        decimal TP_price = longPosition.EntryPrice + SL_size * ProfitSizeFromRZ.ValueDecimal;
                         _tab.CloseAtProfit(longPosition, TP_price, longPosition.OpenVolume);
                         _tab.CloseAtStop(longPosition, SL_price, SL_price);
                         _state = TradingState.LONG_TARGETS_SET;
@@ -171,7 +166,7 @@ namespace OsEngine.Robots.Oleg.Good
                     {
                         decimal SL_price = _bollingerSma.Values.Last();
                         decimal SL_size = SL_price - shortPosition.EntryPrice;
-                        decimal TP_price = shortPosition.EntryPrice - SL_size * LongProfitSizeFromRZ.ValueDecimal; // TODO : use param
+                        decimal TP_price = shortPosition.EntryPrice - SL_size * ProfitSizeFromRZ.ValueDecimal;
                         _tab.CloseAtProfit(shortPosition, TP_price, shortPosition.OpenVolume);
                         _tab.CloseAtStop(shortPosition, SL_price, SL_price);
                         _state = TradingState.SHORT_TARGETS_SET;
