@@ -25,7 +25,6 @@ namespace OsEngine.Robots.Oleg.Good
 
         private StrategyParameterString Regime;
         private StrategyParameterDecimal VolumeFirstEntry;
-        private StrategyParameterString VolumeMode;
         private StrategyParameterInt VolumeDecimals;
 
         private StrategyParameterDecimal ProfitSizeFromRZ;
@@ -37,9 +36,8 @@ namespace OsEngine.Robots.Oleg.Good
             _state = TradingState.FREE;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On", "OnlyLong", "OnlyShort", "OnlyClosePosition" }, "Base");
-            VolumeMode = CreateParameter("Volume type", "Number of contracts", new[] { "Number of contracts", "Contract currency", "% of the total portfolio" }, "Base");
             VolumeDecimals = CreateParameter("Decimals Volume", 2, 1, 50, 4, "Base");
-            VolumeFirstEntry = CreateParameter("Volume", 1, 1m, 10, 1, "Base");
+            VolumeFirstEntry = CreateParameter("Volume %", 100, 1m, 100, 1, "Base");
 
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
@@ -66,10 +64,10 @@ namespace OsEngine.Robots.Oleg.Good
             _bollingerWithSqueeze.SqueezePeriod = BollingerSqueezeLength.ValueInt;
             _bollingerWithSqueeze.Save();
 
-            _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler;
-            _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler;
-            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler;
-            _tab.PositionClosingSuccesEvent += _tab_PositionCloseEventHandler;
+            _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler_SET_ENTRY_ORDERS;
+            _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler_SET_TARGETS;
+            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler_SET_ENTERED_STATE;
+            _tab.PositionClosingSuccesEvent += _tab_PositionCloseEventHandler_SET_FREE_STATE;
 
             ParametrsChangeByUser += ParametersChangeByUserEventHandler;
             ParametersChangeByUserEventHandler();
@@ -112,9 +110,9 @@ namespace OsEngine.Robots.Oleg.Good
 
         public override void ShowIndividualSettingsDialog() { }
 
-        private void _tab_CandleFinishedEventHandler(List<Candle> candles)
+        private void _tab_CandleFinishedEventHandler_SET_ENTRY_ORDERS(List<Candle> candles)
         {
-            if (ReadyForTrading())
+            if (IsRobotEnabled())
             {
                 bool noPositions = _tab.PositionsOpenAll.Count == 0;
                 bool freeState = _state == TradingState.FREE;
@@ -127,21 +125,21 @@ namespace OsEngine.Robots.Oleg.Good
                     if (longsEnabled)
                     {
                         decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
-                        _tab.BuyAtStop(GetVolume(), longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
+                        _tab.BuyAtStop(GetVolume(Side.Buy), longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
                     }
                     bool shortsEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyShort";
                     if (shortsEnabled)
                     {
                         decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
-                        _tab.SellAtStop(GetVolume(), shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
+                        _tab.SellAtStop(GetVolume(Side.Sell), shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
                     }
                 }
             }
         }
 
-        private void _tab_CandleUpdateEventHandler(List<Candle> candles)
+        private void _tab_CandleUpdateEventHandler_SET_TARGETS(List<Candle> candles)
         {
-            if (ReadyForTrading() && _tab.PositionsOpenAll.Count > 0)
+            if (IsRobotEnabled() && _tab.PositionsOpenAll.Count > 0)
             {
                 if (_state == TradingState.LONG_ENTERED)
                 {
@@ -175,7 +173,7 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void _tab_PositionOpenEventHandler(Position position)
+        private void _tab_PositionOpenEventHandler_SET_ENTERED_STATE(Position position)
         {
             if (position != null && position.State == PositionStateType.Open)
             {
@@ -193,15 +191,34 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void _tab_PositionCloseEventHandler(Position position)
+        private void _tab_PositionCloseEventHandler_SET_FREE_STATE(Position position)
         {
             if (position != null && position.State == PositionStateType.Done)
             {
                 _state = TradingState.FREE;
+
+                // TODO : check if fee calculated correctly!
+
+                OlegUtils.Log("\n#{0} {1}\n\topen price = {2}\n\tclose price = {3}\n\tvolume = {4}$\n\tfee = {5}% = {6}$" + 
+                    "\n\tpos profit = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$", 
+                    position.Number,
+                    position.Direction,
+                    position.EntryPrice,
+                    position.ClosePrice,
+                    position.OpenOrders.First().Volume,
+                    position.ComissionValue,
+                    Math.Round(position.CommissionTotal(), 2),
+                    Math.Round(position.ProfitOperationPersent, 2),
+                    Math.Round(position.ProfitOperationPunkt, 4),
+                    Math.Round(position.ProfitPortfolioPersent, 2),
+                    Math.Round(position.ProfitPortfolioPunkt, 4),
+                    Math.Round(position.PortfolioValueOnOpenPosition, 2),
+                    Math.Round(_tab.Portfolio.ValueCurrent, 2)
+                    );
             }
         }
 
-        private bool ReadyForTrading()
+        private bool IsRobotEnabled()
         {
             if (Regime.ValueString == "Off" ||
                 _tab.CandlesAll == null ||
@@ -213,24 +230,14 @@ namespace OsEngine.Robots.Oleg.Good
             return true;
         }
 
-        private decimal GetVolume()
+        private decimal GetVolume(Side side)
         {
-            decimal volume = VolumeFirstEntry.ValueDecimal;
-
-            if (VolumeMode.ValueString == "Contract currency") // "Валюта контракта"
-            {
-                decimal contractPrice = TabsSimple[0].PriceBestAsk;
-                volume = Math.Round(VolumeFirstEntry.ValueDecimal / contractPrice, VolumeDecimals.ValueInt);
-                return volume;
-            }
-            else if (VolumeMode.ValueString == "Number of contracts")
-            {
-                return volume;
-            }
-            else //if (VolumeRegime.ValueString == "% of the total portfolio")
-            {
-                return Math.Round(_tab.Portfolio.ValueCurrent * (volume / 100) / _tab.PriceBestAsk / _tab.Securiti.Lot, VolumeDecimals.ValueInt);
-            }
+            // TODO : take into account fee (we need to left some money for it)
+            decimal volumePercent = VolumeFirstEntry.ValueDecimal;
+            decimal depoBalance = _tab.Portfolio.ValueCurrent;
+            decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
+            decimal volume = depoBalance * (volumePercent / 100) / price / _tab.Securiti.Lot;
+            return Math.Round(volume, VolumeDecimals.ValueInt);
         }
 
         enum TradingState
