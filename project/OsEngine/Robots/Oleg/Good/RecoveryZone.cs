@@ -196,10 +196,7 @@ namespace OsEngine.Robots.Oleg.Good
             if (position != null && position.State == PositionStateType.Done)
             {
                 _state = TradingState.FREE;
-
-                // TODO : check if fee calculated correctly!
-
-                OlegUtils.Log("\n#{0} {1}\n\topen price = {2}\n\tclose price = {3}\n\tvolume = {4}$\n\tfee = {5}% = {6}$" + 
+                OlegUtils.Log("\n#{0} {1}\n\topen price = {2}\n\tclose price = {3}\n\tvolume = {4}\n\tfee = {5}% = {6}$" + 
                     "\n\tpos profit = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$", 
                     position.Number,
                     position.Direction,
