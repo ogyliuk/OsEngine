@@ -206,7 +206,7 @@ namespace OsEngine.Robots.Oleg.Good
                 _moneyFirstEntry = 0;
                 _state = TradingState.FREE;
                 OlegUtils.Log("\n#{0} {1}\n\tvolume = {2}\n\topen price = {3}\n\tclose price = {4}\n\tfee = {5}% = {6}$" + 
-                    "\n\tpos profit = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$", 
+                    "\n\tprice change = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$", 
                     position.Number,
                     position.Direction,
                     position.OpenOrders.First().Volume,
@@ -221,7 +221,6 @@ namespace OsEngine.Robots.Oleg.Good
                     Math.Round(position.PortfolioValueOnOpenPosition, 2),
                     Math.Round(position.PortfolioValueOnOpenPosition + position.ProfitPortfolioPunkt, 2)
                     );
-                // TODO : why position.ProfitOperationPunkt and position.ProfitPortfolioPunkt are so different?
             }
         }
 
