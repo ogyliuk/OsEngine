@@ -15,6 +15,7 @@ namespace OsEngine.Robots.Oleg.Good
         private BotTabSimple _tab;
         private TradingState _state;
         private decimal _moneyFirstEntry;
+        private int _attemptNumber;
 
         private MovingAverage _bollingerSma;
         private Bollinger _bollinger;
@@ -27,6 +28,7 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterString Regime;
         private StrategyParameterDecimal VolumeMultiplier;
         private StrategyParameterInt VolumeDecimals;
+        private StrategyParameterDecimal MinVolumeUSDT;
 
         private StrategyParameterDecimal ProfitSizeFromRZ;
 
@@ -36,10 +38,12 @@ namespace OsEngine.Robots.Oleg.Good
             _tab = TabsSimple[0];
             _state = TradingState.FREE;
             _moneyFirstEntry = 0;
+            _attemptNumber = 0;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On", "OnlyLong", "OnlyShort", "OnlyClosePosition" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
             VolumeMultiplier = CreateParameter("Volume multiplier", 0.75m, 0.25m, 1, 0.05m, "Base");
+            MinVolumeUSDT = CreateParameter("Min Volume USDT", 5.5m, 5.5m, 5.5m, 1m, "Base");
 
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
@@ -190,6 +194,7 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     _state = TradingState.SHORT_ENTERED;
                 }
+                _attemptNumber++;
             }
         }
 
@@ -197,6 +202,7 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (position != null && position.State == PositionStateType.Done)
             {
+                _attemptNumber = 0;
                 _moneyFirstEntry = 0;
                 _state = TradingState.FREE;
                 OlegUtils.Log("\n#{0} {1}\n\tvolume = {2}\n\topen price = {3}\n\tclose price = {4}\n\tfee = {5}% = {6}$" + 
@@ -231,20 +237,20 @@ namespace OsEngine.Robots.Oleg.Good
             return true;
         }
 
-        private decimal GetVolume(Side side, int attemptNumber = 1)
+        private decimal GetVolume(Side side)
         {
-            if (attemptNumber == 1)
+            if (_attemptNumber == 0)
             {
                 _moneyFirstEntry = _tab.Portfolio.ValueCurrent;
             }            
-            decimal moneyCurrentAttemptNoFee = GetMoneyForCurrentAttempt(attemptNumber);
-            decimal moneyCurrentAttemptAfterFee = moneyCurrentAttemptNoFee - moneyCurrentAttemptNoFee / 100 * _tab.ComissionValue;
+            decimal moneyNewAttemptNoFee = GetMoneyForNewAttempt(_attemptNumber + 1);
+            decimal moneyNewAttemptAfterFee = moneyNewAttemptNoFee - moneyNewAttemptNoFee / 100 * _tab.ComissionValue;
             decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
-            decimal volume = moneyCurrentAttemptAfterFee / price;
+            decimal volume = moneyNewAttemptAfterFee / price;
             return Math.Round(volume, VolumeDecimals.ValueInt);
         }
 
-        private decimal GetMoneyForCurrentAttempt(int attemptNumber)
+        private decimal GetMoneyForNewAttempt(int attemptNumber)
         {
             decimal moneyCurrentEntry = _moneyFirstEntry;
             for (int i = 0; i < attemptNumber - 1; i++)
