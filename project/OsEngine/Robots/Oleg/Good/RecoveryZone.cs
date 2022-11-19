@@ -14,6 +14,7 @@ namespace OsEngine.Robots.Oleg.Good
     {
         private BotTabSimple _tab;
         private TradingState _state;
+        private decimal _balanceAvailable; // TODO : Start to use
         private decimal _moneyFirstEntry;
         private int _attemptNumber;
 
@@ -70,10 +71,10 @@ namespace OsEngine.Robots.Oleg.Good
             _bollingerWithSqueeze.SqueezePeriod = BollingerSqueezeLength.ValueInt;
             _bollingerWithSqueeze.Save();
 
-            _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler_SET_ENTRY_ORDERS;
-            _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler_SET_TARGETS;
-            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler_SET_ENTERED_STATE;
-            _tab.PositionClosingSuccesEvent += _tab_PositionCloseEventHandler_SET_FREE_STATE;
+            _tab.CandleFinishedEvent += _tab_CandleFinishedEventHandler_SQUEEZE_FOUND;
+            _tab.CandleUpdateEvent += _tab_CandleUpdateEventHandler_SET_NEXT_ORDERS;
+            _tab.PositionOpeningSuccesEvent += _tab_PositionOpenEventHandler_FILLED_ENTRY_ORDER;
+            _tab.PositionClosingSuccesEvent += _tab_PositionCloseEventHandler_FINISH_DEAL;
 
             ParametrsChangeByUser += ParametersChangeByUserEventHandler;
             ParametersChangeByUserEventHandler();
@@ -116,7 +117,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         public override void ShowIndividualSettingsDialog() { }
 
-        private void _tab_CandleFinishedEventHandler_SET_ENTRY_ORDERS(List<Candle> candles)
+        private void _tab_CandleFinishedEventHandler_SQUEEZE_FOUND(List<Candle> candles)
         {
             if (IsRobotEnabled())
             {
@@ -125,6 +126,7 @@ namespace OsEngine.Robots.Oleg.Good
                 bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
                 if (noPositions && freeState && lastCandleHasSqueeze)
                 {
+                    _balanceAvailable = _tab.Portfolio.ValueCurrent;
                     _state = TradingState.SQUEEZE_FOUND;
                     decimal semiSqueezeVolatility = (_bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last()) / 2;
                     bool longsEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyLong";
@@ -143,7 +145,26 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void _tab_CandleUpdateEventHandler_SET_TARGETS(List<Candle> candles)
+        private void _tab_PositionOpenEventHandler_FILLED_ENTRY_ORDER(Position position)
+        {
+            if (position != null && position.State == PositionStateType.Open)
+            {
+                _tab.SellAtStopCancel();
+                _tab.BuyAtStopCancel();
+
+                if (position.Direction == Side.Buy)
+                {
+                    _state = TradingState.LONG_ENTERED;
+                }
+                if (position.Direction == Side.Sell)
+                {
+                    _state = TradingState.SHORT_ENTERED;
+                }
+                _attemptNumber++;
+            }
+        }
+
+        private void _tab_CandleUpdateEventHandler_SET_NEXT_ORDERS(List<Candle> candles)
         {
             if (IsRobotEnabled() && _tab.PositionsOpenAll.Count > 0)
             {
@@ -179,26 +200,7 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void _tab_PositionOpenEventHandler_SET_ENTERED_STATE(Position position)
-        {
-            if (position != null && position.State == PositionStateType.Open)
-            {
-                _tab.SellAtStopCancel();
-                _tab.BuyAtStopCancel();
-
-                if (position.Direction == Side.Buy)
-                {
-                    _state = TradingState.LONG_ENTERED;
-                }
-                if (position.Direction == Side.Sell)
-                {
-                    _state = TradingState.SHORT_ENTERED;
-                }
-                _attemptNumber++;
-            }
-        }
-
-        private void _tab_PositionCloseEventHandler_SET_FREE_STATE(Position position)
+        private void _tab_PositionCloseEventHandler_FINISH_DEAL(Position position)
         {
             if (position != null && position.State == PositionStateType.Done)
             {
@@ -247,6 +249,12 @@ namespace OsEngine.Robots.Oleg.Good
             decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
             decimal volume = moneyNewAttemptAfterFee / price;
             return Math.Round(volume, VolumeDecimals.ValueInt);
+        }
+
+        private bool IsNextAttemptPossible()
+        {
+            // TODO : work with depo size and MinVolumeUSDT here
+            return true;
         }
 
         private decimal GetMoneyForNewAttempt(int attemptNumber)
