@@ -14,9 +14,7 @@ namespace OsEngine.Robots.Oleg.Good
     {
         private BotTabSimple _tab;
         private TradingState _state;
-        private decimal _balanceAvailable; // TODO : Start to use
-        private decimal _moneyFirstEntry;
-        private int _attemptNumber;
+        private decimal _balanceOnDealStart;
 
         private MovingAverage _bollingerSma;
         private Bollinger _bollinger;
@@ -37,14 +35,13 @@ namespace OsEngine.Robots.Oleg.Good
         {
             TabCreate(BotTabType.Simple);
             _tab = TabsSimple[0];
+            _balanceOnDealStart = 0;
             _state = TradingState.FREE;
-            _moneyFirstEntry = 0;
-            _attemptNumber = 0;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On", "OnlyLong", "OnlyShort", "OnlyClosePosition" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
             VolumeMultiplier = CreateParameter("Volume multiplier", 0.75m, 0.25m, 1, 0.05m, "Base");
-            MinVolumeUSDT = CreateParameter("Min Volume USDT", 5.5m, 5.5m, 5.5m, 1m, "Base");
+            MinVolumeUSDT = CreateParameter("Min Volume USDT", 7m, 7m, 7m, 1m, "Base");
 
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
@@ -119,54 +116,64 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void _tab_CandleFinishedEventHandler_SQUEEZE_FOUND(List<Candle> candles)
         {
-            if (IsRobotEnabled())
+            if (IsBotEnabled())
             {
                 bool noPositions = _tab.PositionsOpenAll.Count == 0;
                 bool freeState = _state == TradingState.FREE;
                 bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
                 if (noPositions && freeState && lastCandleHasSqueeze)
                 {
-                    _balanceAvailable = _tab.Portfolio.ValueCurrent;
                     _state = TradingState.SQUEEZE_FOUND;
+                    _balanceOnDealStart = _tab.Portfolio.ValueCurrent;
+
                     decimal semiSqueezeVolatility = (_bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last()) / 2;
+
                     bool longsEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyLong";
                     if (longsEnabled)
                     {
-                        decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
-                        _tab.BuyAtStop(GetVolume(Side.Buy), longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
+                        decimal buyCoinsVolume = GetNewAttemptCoinsVolume(Side.Buy);
+                        if (buyCoinsVolume > 0)
+                        {
+                            decimal longEntryPrice = _bollingerWithSqueeze.ValuesUp.Last() + semiSqueezeVolatility;
+                            _tab.BuyAtStop(buyCoinsVolume, longEntryPrice, longEntryPrice, StopActivateType.HigherOrEqual, 100);
+                        }
                     }
+
                     bool shortsEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyShort";
                     if (shortsEnabled)
                     {
-                        decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
-                        _tab.SellAtStop(GetVolume(Side.Sell), shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
+                        decimal sellCoinsVolume = GetNewAttemptCoinsVolume(Side.Sell);
+                        if (sellCoinsVolume > 0)
+                        {
+                            decimal shortEntryPrice = _bollingerWithSqueeze.ValuesDown.Last() - semiSqueezeVolatility;
+                            _tab.SellAtStop(sellCoinsVolume, shortEntryPrice, shortEntryPrice, StopActivateType.LowerOrEqyal, 100);
+                        }
                     }
                 }
             }
         }
 
-        private void _tab_PositionOpenEventHandler_FILLED_ENTRY_ORDER(Position position)
+        private void _tab_PositionOpenEventHandler_FILLED_ENTRY_ORDER(Position p)
         {
-            if (position != null && position.State == PositionStateType.Open)
+            if (p != null && p.State == PositionStateType.Open)
             {
                 _tab.SellAtStopCancel();
                 _tab.BuyAtStopCancel();
 
-                if (position.Direction == Side.Buy)
+                if (p.Direction == Side.Buy)
                 {
                     _state = TradingState.LONG_ENTERED;
                 }
-                if (position.Direction == Side.Sell)
+                if (p.Direction == Side.Sell)
                 {
                     _state = TradingState.SHORT_ENTERED;
                 }
-                _attemptNumber++;
             }
         }
 
         private void _tab_CandleUpdateEventHandler_SET_NEXT_ORDERS(List<Candle> candles)
         {
-            if (IsRobotEnabled() && _tab.PositionsOpenAll.Count > 0)
+            if (IsBotEnabled() && _tab.PositionsOpenAll.Count > 0)
             {
                 if (_state == TradingState.LONG_ENTERED)
                 {
@@ -200,33 +207,32 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void _tab_PositionCloseEventHandler_FINISH_DEAL(Position position)
+        private void _tab_PositionCloseEventHandler_FINISH_DEAL(Position p)
         {
-            if (position != null && position.State == PositionStateType.Done)
+            if (p != null && p.State == PositionStateType.Done)
             {
-                _attemptNumber = 0;
-                _moneyFirstEntry = 0;
+                _balanceOnDealStart = 0;
                 _state = TradingState.FREE;
                 OlegUtils.Log("\n#{0} {1}\n\tvolume = {2}\n\topen price = {3}\n\tclose price = {4}\n\tfee = {5}% = {6}$" + 
                     "\n\tprice change = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$", 
-                    position.Number,
-                    position.Direction,
-                    position.OpenOrders.First().Volume,
-                    position.EntryPrice,
-                    position.ClosePrice,
-                    position.ComissionValue,
-                    Math.Round(position.CommissionTotal(), 2),
-                    Math.Round(position.ProfitOperationPersent, 2),
-                    Math.Round(position.ProfitOperationPunkt, 4),
-                    Math.Round(position.ProfitPortfolioPersent, 2),
-                    Math.Round(position.ProfitPortfolioPunkt, 4),
-                    Math.Round(position.PortfolioValueOnOpenPosition, 2),
-                    Math.Round(position.PortfolioValueOnOpenPosition + position.ProfitPortfolioPunkt, 2)
+                    p.Number,
+                    p.Direction,
+                    p.OpenOrders.First().Volume,
+                    p.EntryPrice,
+                    p.ClosePrice,
+                    p.ComissionValue,
+                    Math.Round(p.CommissionTotal(), 2),
+                    Math.Round(p.ProfitOperationPersent, 2),
+                    Math.Round(p.ProfitOperationPunkt, 4),
+                    Math.Round(p.ProfitPortfolioPersent, 2),
+                    Math.Round(p.ProfitPortfolioPunkt, 4),
+                    Math.Round(p.PortfolioValueOnOpenPosition, 2),
+                    Math.Round(p.PortfolioValueOnOpenPosition + p.ProfitPortfolioPunkt, 2)
                     );
             }
         }
 
-        private bool IsRobotEnabled()
+        private bool IsBotEnabled()
         {
             if (Regime.ValueString == "Off" ||
                 _tab.CandlesAll == null ||
@@ -238,33 +244,53 @@ namespace OsEngine.Robots.Oleg.Good
             return true;
         }
 
-        private decimal GetVolume(Side side)
+        private decimal GetNewAttemptCoinsVolume(Side side)
         {
-            if (_attemptNumber == 0)
+            decimal coinsVolume = 0;
+            if (HasMoneyForNewAttempt() && !IsMoneyForNewAttemptTooSmall())
             {
-                _moneyFirstEntry = _tab.Portfolio.ValueCurrent;
-            }            
-            decimal moneyNewAttemptNoFee = GetMoneyForNewAttempt(_attemptNumber + 1);
-            decimal moneyNewAttemptAfterFee = moneyNewAttemptNoFee - moneyNewAttemptNoFee / 100 * _tab.ComissionValue;
-            decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
-            decimal volume = moneyNewAttemptAfterFee / price;
-            return Math.Round(volume, VolumeDecimals.ValueInt);
-        }
-
-        private bool IsNextAttemptPossible()
-        {
-            // TODO : work with depo size and MinVolumeUSDT here
-            return true;
-        }
-
-        private decimal GetMoneyForNewAttempt(int attemptNumber)
-        {
-            decimal moneyCurrentEntry = _moneyFirstEntry;
-            for (int i = 0; i < attemptNumber - 1; i++)
-            {
-                moneyCurrentEntry = moneyCurrentEntry * VolumeMultiplier.ValueDecimal;
+                decimal moneyAvailableForNewAttempt = GetNewAttemptMoneyNeeded();
+                decimal moneyNeededForFee = moneyAvailableForNewAttempt / 100 * _tab.ComissionValue;
+                decimal moneyLeftForCoins = moneyAvailableForNewAttempt - moneyNeededForFee;
+                decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
+                decimal volume = moneyLeftForCoins / price;
+                coinsVolume = Math.Round(volume, VolumeDecimals.ValueInt);
             }
-            return moneyCurrentEntry;
+            return coinsVolume;
+        }
+
+        private bool IsMoneyForNewAttemptTooSmall()
+        {
+            return GetNewAttemptMoneyNeeded() < MinVolumeUSDT.ValueDecimal;
+        }
+
+        private bool HasMoneyForNewAttempt()
+        {
+            return GetFreeMoney() > GetNewAttemptMoneyNeeded();
+        }
+
+        private decimal GetNewAttemptMoneyNeeded()
+        {
+            bool hasOpenPositionsAlready = _tab.PositionsLast != null && _tab.PositionsLast.State == PositionStateType.Open;
+            decimal moneyToCalcFrom = hasOpenPositionsAlready ? GetLastPositionEntryMoney() : _tab.Portfolio.ValueCurrent;
+            return moneyToCalcFrom * VolumeMultiplier.ValueDecimal;
+        }
+
+        private decimal GetLastPositionEntryMoney()
+        {
+            return _tab.PositionsLast != null ? GetPositionEntryMoney(_tab.PositionsLast) : 0;
+        }
+
+        private decimal GetFreeMoney()
+        {
+            decimal freeMoney = _balanceOnDealStart;
+            _tab.PositionsOpenAll.ForEach(p => { freeMoney -= GetPositionEntryMoney(p); });
+            return freeMoney;
+        }
+
+        private decimal GetPositionEntryMoney(Position p)
+        {
+            return p.OpenVolume * p.EntryPrice + p.CommissionTotal();
         }
 
         enum TradingState
