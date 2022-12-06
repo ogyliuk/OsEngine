@@ -68,7 +68,6 @@ namespace OsEngine.Robots.Oleg.Good
             _bollingerWithSqueeze.Save();
 
             _bot.CandleFinishedEvent += event_CandleFinished_SQUEEZE_FOUND;
-            _bot.CandleUpdateEvent += event_CandleUpdated_SET_NEXT_ORDERS;
             _bot.PositionOpeningSuccesEvent += event_PositionOpened_MANAGE_ENTRIES;
             _bot.PositionClosingSuccesEvent += event_PositionClosed_FINISH_DEAL;
 
@@ -117,10 +116,10 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (ReadyToTrade())
             {
-                bool noPositions = _bot.PositionsOpenAll.Count == 0;
                 bool freeState = _state == TradingState.FREE;
+                bool noPositions = _bot.PositionsOpenAll.Count == 0;
                 bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
-                if (noPositions && freeState && lastCandleHasSqueeze)
+                if (freeState && noPositions && lastCandleHasSqueeze)
                 {
                     _state = TradingState.SQUEEZE_FOUND;
                     _balanceOnStart = _bot.Portfolio.ValueCurrent;
@@ -128,8 +127,8 @@ namespace OsEngine.Robots.Oleg.Good
                     decimal squeezeSize = _bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last();
                     _zoneUp = _bollingerWithSqueeze.ValuesUp.Last() + squeezeSize / 2;
                     _zoneDown = _bollingerWithSqueeze.ValuesDown.Last() - squeezeSize / 2;
-                    SetNewEntryOrder_LONG();
-                    SetNewEntryOrder_SHORT();
+                    Set_EN_Order_LONG();
+                    Set_EN_Order_SHORT();
                 }
             }
         }
@@ -140,52 +139,30 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 if (p.Direction == Side.Buy)
                 {
-                    _state = TradingState.LONG_ENTERED;
-                    _zoneDown = _bot.PositionsOpenAll.Count == 1 ? _bollingerSma.Values.Last() : _zoneDown;
-                    SetNewEntryOrder_SHORT();
+                    if (IsFirstEntry())
+                    {
+                        _zoneDown = _bollingerSma.Values.Last();
+                    }                    
+
+                    Set_TP_Order_LONG(p);
+                    Set_SL_Order_LONG(p);
+                    Set_EN_Order_SHORT();
+
+                    _state = TradingState.LONG_TARGETS_SET;
                 }
 
                 if (p.Direction == Side.Sell)
                 {
-                    _state = TradingState.SHORT_ENTERED;
-                    _zoneUp = _bot.PositionsOpenAll.Count == 1 ? _bollingerSma.Values.Last() : _zoneUp;
-                    SetNewEntryOrder_LONG();
-                }
-            }
-        }
-
-        private void event_CandleUpdated_SET_NEXT_ORDERS(List<Candle> candles)
-        {
-            if (_bot.PositionsOpenAll.Count > 0)
-            {
-                if (_state == TradingState.LONG_ENTERED)
-                {
-                    Position longPosition = _bot.PositionsOpenAll
-                        .Where(p => p.State == PositionStateType.Open && p.Direction == Side.Buy).FirstOrDefault();
-                    if (longPosition != null)
+                    if (IsFirstEntry())
                     {
-                        decimal SL_price = _zoneDown;
-                        decimal SL_size = longPosition.EntryPrice - SL_price;
-                        decimal TP_price = longPosition.EntryPrice + SL_size * ProfitSizeFromRZ.ValueDecimal;
-                        _bot.CloseAtProfit(longPosition, TP_price, longPosition.OpenVolume);
-                        _bot.CloseAtStop(longPosition, SL_price, SL_price);
-                        _state = TradingState.LONG_TARGETS_SET;
+                        _zoneUp = _bollingerSma.Values.Last();
                     }
-                }
 
-                if (_state == TradingState.SHORT_ENTERED)
-                {
-                    Position shortPosition = _bot.PositionsOpenAll
-                        .Where(p => p.State == PositionStateType.Open && p.Direction == Side.Sell).FirstOrDefault();
-                    if (shortPosition != null)
-                    {
-                        decimal SL_price = _zoneUp;
-                        decimal SL_size = SL_price - shortPosition.EntryPrice;
-                        decimal TP_price = shortPosition.EntryPrice - SL_size * ProfitSizeFromRZ.ValueDecimal;
-                        _bot.CloseAtProfit(shortPosition, TP_price, shortPosition.OpenVolume);
-                        _bot.CloseAtStop(shortPosition, SL_price, SL_price);
-                        _state = TradingState.SHORT_TARGETS_SET;
-                    }
+                    Set_TP_Order_SHORT(p);
+                    Set_SL_Order_SHORT(p);
+                    Set_EN_Order_LONG();
+
+                    _state = TradingState.SHORT_TARGETS_SET;                    
                 }
             }
         }
@@ -215,7 +192,35 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void SetNewEntryOrder_LONG()
+        private void Set_TP_Order_LONG(Position p)
+        {
+            decimal SL_price = _zoneDown;
+            decimal SL_size = p.EntryPrice - SL_price;
+            decimal TP_price = p.EntryPrice + SL_size * ProfitSizeFromRZ.ValueDecimal;
+            _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
+        }
+
+        private void Set_TP_Order_SHORT(Position p)
+        {
+            decimal SL_price = _zoneUp;
+            decimal SL_size = SL_price - p.EntryPrice;
+            decimal TP_price = p.EntryPrice - SL_size * ProfitSizeFromRZ.ValueDecimal;
+            _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
+        }
+
+        private void Set_SL_Order_LONG(Position p)
+        {
+            decimal SL_price = _zoneDown;
+            _bot.CloseAtStop(p, SL_price, SL_price);
+        }
+
+        private void Set_SL_Order_SHORT(Position p)
+        {
+            decimal SL_price = _zoneUp;
+            _bot.CloseAtStop(p, SL_price, SL_price);
+        }
+
+        private void Set_EN_Order_LONG()
         {
             _bot.BuyAtStopCancel();
             decimal buyCoinsVolume = GetNewAttemptCoinsVolume(Side.Buy);
@@ -225,7 +230,7 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void SetNewEntryOrder_SHORT()
+        private void Set_EN_Order_SHORT()
         {
             _bot.SellAtStopCancel();
             decimal sellCoinsVolume = GetNewAttemptCoinsVolume(Side.Sell);
@@ -233,6 +238,11 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 _bot.SellAtStop(sellCoinsVolume, _zoneDown, _zoneDown, StopActivateType.LowerOrEqyal, 100);
             }
+        }
+
+        private bool IsFirstEntry()
+        {
+            return _bot.PositionsOpenAll.Count == 1;
         }
 
         private bool ReadyToTrade()
@@ -293,14 +303,18 @@ namespace OsEngine.Robots.Oleg.Good
             return p.OpenVolume * p.EntryPrice + p.CommissionTotal();
         }
 
+        // TODO : go to approach where just direction is set
         enum TradingState
         {
             FREE,
             SQUEEZE_FOUND,
-            LONG_ENTERED,
-            SHORT_ENTERED,
             LONG_TARGETS_SET,
             SHORT_TARGETS_SET
         }
+
+        // ******************** CANDLE UPDATE ***********************
+        // _bot.CandleUpdateEvent += event_CandleUpdated;
+        // private void event_CandleUpdated(List<Candle> candles) { }
+        // **********************************************************
     }
 }
