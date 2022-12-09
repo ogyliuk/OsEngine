@@ -13,7 +13,6 @@ namespace OsEngine.Robots.Oleg.Good
     public class RecoveryZone : BotPanel
     {
         private static readonly bool LOGGING_ENABLED = false;
-        private static readonly bool SHOW_BOLLINGER_BANDS = false;
 
         private BotTabSimple _bot;
         private TradingState _state;
@@ -21,8 +20,7 @@ namespace OsEngine.Robots.Oleg.Good
         private decimal _zoneDown;
         private decimal _balanceOnStart;
 
-        private MovingAverage _bollingerSma;
-        private Bollinger _bollinger;
+        private MovingAverage _bollingerSma; // TODO : get rid of it and have only 1 indicator
         private BollingerWithSqueeze _bollingerWithSqueeze;
 
         private StrategyParameterInt BollingerLength;
@@ -51,16 +49,7 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
             ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
 
-            if (SHOW_BOLLINGER_BANDS)
-            {
-                _bollinger = new Bollinger(name + "Bollinger", false);
-                _bollinger = (Bollinger)_bot.CreateCandleIndicator(_bollinger, "Prime");
-                _bollinger.Lenght = BollingerLength.ValueInt;
-                _bollinger.Deviation = BollingerDeviation.ValueDecimal;
-                _bollinger.Save();
-            }
-
-            _bollingerSma = new MovingAverage(false);
+            _bollingerSma = new MovingAverage(name + "BollingerSma", false);
             _bollingerSma = (MovingAverage)_bot.CreateCandleIndicator(_bollingerSma, "Prime");
             _bollingerSma.TypeCalculationAverage = MovingAverageTypeCalculation.Simple;
             _bollingerSma.Lenght = BollingerLength.ValueInt;
@@ -95,18 +84,6 @@ namespace OsEngine.Robots.Oleg.Good
                 _bollingerSma.Lenght = BollingerLength.ValueInt;
                 _bollingerSma.Reload();
                 _bollingerSma.Save();
-            }
-
-            if (SHOW_BOLLINGER_BANDS)
-            {
-                if (_bollinger.Lenght != BollingerLength.ValueInt ||
-                    _bollinger.Deviation != BollingerDeviation.ValueDecimal)
-                {
-                    _bollinger.Lenght = BollingerLength.ValueInt;
-                    _bollinger.Deviation = BollingerDeviation.ValueDecimal;
-                    _bollinger.Reload();
-                    _bollinger.Save();
-                }
             }
 
             if (_bollingerWithSqueeze.Lenght != BollingerLength.ValueInt ||

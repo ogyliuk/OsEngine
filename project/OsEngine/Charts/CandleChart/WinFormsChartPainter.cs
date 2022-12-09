@@ -1206,7 +1206,6 @@ namespace OsEngine.Charts.CandleChart
         /// <param name="history">candles/свечи</param>
         private void PaintCandles(List<Candle> history)
         {
-            OlegUtils.Log("st PaintCandles");
             if (_mouseDown == true)
             {
                 return;
@@ -1293,7 +1292,6 @@ namespace OsEngine.Charts.CandleChart
             {
                 SendLogMessage(error.ToString(), LogMessageType.Error);
             }
-            OlegUtils.Log("en PaintCandles");
         }
 
         /// <summary>
@@ -3067,9 +3065,9 @@ namespace OsEngine.Charts.CandleChart
         /// добавить индикатор в прорисовку
         /// </summary>
         /// <param name="indicator">indicator/индикатор</param>
-        public void ProcessIndicator(IIndicator indicator)
+        public void ProcessIndicator(IIndicator indicator) // TODO : optimize
         {
-            OlegUtils.Log("st ProcessIndicator");
+            OlegUtils.Log("st ProcessIndicator = " + indicator.Name);
             if ((_startProgram == StartProgram.IsTester
                 || _startProgram == StartProgram.IsOsMiner ||
                 IsPatternChart)
@@ -3100,7 +3098,7 @@ namespace OsEngine.Charts.CandleChart
                     _indicatorsToPaint.Enqueue(indicator);
                 }
             }
-            OlegUtils.Log("en ProcessIndicator");
+            OlegUtils.Log("en ProcessIndicator = " + indicator.Name);
         }
 
         /// <summary>
