@@ -3695,9 +3695,11 @@ namespace OsEngine.OsTrader.Panels.Tab
                             { // пользователь может удалить сам из слоя увидив что сделка открыается
                                 return;
                             }
-
-                            _stopsOpener.RemoveAt(i);
-                            i = -1;
+                            else
+                            {
+                                _stopsOpener.RemoveAt(_stopsOpener.Count - 1);
+                                i = -1;
+                            }
 
                             if (PositionSellAtStopActivateEvent != null && pos != null)
                             { PositionSellAtStopActivateEvent(pos); }

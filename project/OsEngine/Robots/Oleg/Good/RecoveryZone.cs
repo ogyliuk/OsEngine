@@ -12,6 +12,9 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("RecoveryZone")]
     public class RecoveryZone : BotPanel
     {
+        private static readonly bool LOGGING_ENABLED = false;
+        private static readonly bool SHOW_BOLLINGER_BANDS = false;
+
         private BotTabSimple _bot;
         private TradingState _state;
         private decimal _zoneUp;
@@ -48,17 +51,20 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
             ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
 
+            if (SHOW_BOLLINGER_BANDS)
+            {
+                _bollinger = new Bollinger(name + "Bollinger", false);
+                _bollinger = (Bollinger)_bot.CreateCandleIndicator(_bollinger, "Prime");
+                _bollinger.Lenght = BollingerLength.ValueInt;
+                _bollinger.Deviation = BollingerDeviation.ValueDecimal;
+                _bollinger.Save();
+            }
+
             _bollingerSma = new MovingAverage(false);
             _bollingerSma = (MovingAverage)_bot.CreateCandleIndicator(_bollingerSma, "Prime");
             _bollingerSma.TypeCalculationAverage = MovingAverageTypeCalculation.Simple;
             _bollingerSma.Lenght = BollingerLength.ValueInt;
             _bollingerSma.Save();
-
-            _bollinger = new Bollinger(name + "Bollinger", false);
-            _bollinger = (Bollinger)_bot.CreateCandleIndicator(_bollinger, "Prime");
-            _bollinger.Lenght = BollingerLength.ValueInt;
-            _bollinger.Deviation = BollingerDeviation.ValueDecimal;
-            _bollinger.Save();
 
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
             _bollingerWithSqueeze = (BollingerWithSqueeze)_bot.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
@@ -68,7 +74,7 @@ namespace OsEngine.Robots.Oleg.Good
             _bollingerWithSqueeze.Save();
 
             _bot.CandleFinishedEvent += event_CandleFinished_SQUEEZE_FOUND;
-            _bot.PositionOpeningSuccesEvent += event_PositionOpened_MANAGE_ENTRIES;
+            _bot.PositionOpeningSuccesEvent += event_PositionOpened_SET_ORDERS;
             _bot.PositionClosingSuccesEvent += event_PositionClosed_FINISH_DEAL;
 
             this.ParametrsChangeByUser += event_ParametersChangedByUser;
@@ -91,13 +97,16 @@ namespace OsEngine.Robots.Oleg.Good
                 _bollingerSma.Save();
             }
 
-            if (_bollinger.Lenght != BollingerLength.ValueInt ||
-                _bollinger.Deviation != BollingerDeviation.ValueDecimal)
+            if (SHOW_BOLLINGER_BANDS)
             {
-                _bollinger.Lenght = BollingerLength.ValueInt;
-                _bollinger.Deviation = BollingerDeviation.ValueDecimal;
-                _bollinger.Reload();
-                _bollinger.Save();
+                if (_bollinger.Lenght != BollingerLength.ValueInt ||
+                    _bollinger.Deviation != BollingerDeviation.ValueDecimal)
+                {
+                    _bollinger.Lenght = BollingerLength.ValueInt;
+                    _bollinger.Deviation = BollingerDeviation.ValueDecimal;
+                    _bollinger.Reload();
+                    _bollinger.Save();
+                }
             }
 
             if (_bollingerWithSqueeze.Lenght != BollingerLength.ValueInt ||
@@ -133,7 +142,7 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void event_PositionOpened_MANAGE_ENTRIES(Position p)
+        private void event_PositionOpened_SET_ORDERS(Position p)
         {
             if (p != null && p.State == PositionStateType.Open)
             {
@@ -148,7 +157,7 @@ namespace OsEngine.Robots.Oleg.Good
                     Set_SL_Order_LONG(p);
                     Set_EN_Order_SHORT();
 
-                    _state = TradingState.LONG_TARGETS_SET;
+                    _state = TradingState.LONG_ENTERED;
                 }
 
                 if (p.Direction == Side.Sell)
@@ -162,7 +171,7 @@ namespace OsEngine.Robots.Oleg.Good
                     Set_SL_Order_SHORT(p);
                     Set_EN_Order_LONG();
 
-                    _state = TradingState.SHORT_TARGETS_SET;                    
+                    _state = TradingState.SHORT_ENTERED;                    
                 }
             }
         }
@@ -172,23 +181,7 @@ namespace OsEngine.Robots.Oleg.Good
             if (p != null && p.State == PositionStateType.Done)
             {
                 _state = TradingState.FREE;
-
-                OlegUtils.Log("\n#{0} {1}\n\tvolume = {2}\n\topen price = {3}\n\tclose price = {4}\n\tfee = {5}% = {6}$" + 
-                    "\n\tprice change = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$", 
-                    p.Number,
-                    p.Direction,
-                    p.OpenOrders.First().Volume,
-                    p.EntryPrice,
-                    p.ClosePrice,
-                    p.ComissionValue,
-                    Math.Round(p.CommissionTotal(), 2),
-                    Math.Round(p.ProfitOperationPersent, 2),
-                    Math.Round(p.ProfitOperationPunkt, 4),
-                    Math.Round(p.ProfitPortfolioPersent, 2),
-                    Math.Round(p.ProfitPortfolioPunkt, 4),
-                    Math.Round(p.PortfolioValueOnOpenPosition, 2),
-                    Math.Round(p.PortfolioValueOnOpenPosition + p.ProfitPortfolioPunkt, 2)
-                    );
+                LogPositionResults(p);
             }
         }
 
@@ -303,13 +296,35 @@ namespace OsEngine.Robots.Oleg.Good
             return p.OpenVolume * p.EntryPrice + p.CommissionTotal();
         }
 
-        // TODO : go to approach where just direction is set
+        private static void LogPositionResults(Position p)
+        {
+            if (LOGGING_ENABLED)
+            {
+                OlegUtils.Log("\n#{0} {1}\n\tvolume = {2}\n\topen price = {3}\n\tclose price = {4}\n\tfee = {5}% = {6}$" +
+                    "\n\tprice change = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$",
+                    p.Number,
+                    p.Direction,
+                    p.OpenOrders.First().Volume,
+                    p.EntryPrice,
+                    p.ClosePrice,
+                    p.ComissionValue,
+                    Math.Round(p.CommissionTotal(), 2),
+                    Math.Round(p.ProfitOperationPersent, 2),
+                    Math.Round(p.ProfitOperationPunkt, 4),
+                    Math.Round(p.ProfitPortfolioPersent, 2),
+                    Math.Round(p.ProfitPortfolioPunkt, 4),
+                    Math.Round(p.PortfolioValueOnOpenPosition, 2),
+                    Math.Round(p.PortfolioValueOnOpenPosition + p.ProfitPortfolioPunkt, 2)
+                    );
+            }
+        }
+
         enum TradingState
         {
             FREE,
             SQUEEZE_FOUND,
-            LONG_TARGETS_SET,
-            SHORT_TARGETS_SET
+            LONG_ENTERED,
+            SHORT_ENTERED
         }
 
         // ******************** CANDLE UPDATE ***********************
