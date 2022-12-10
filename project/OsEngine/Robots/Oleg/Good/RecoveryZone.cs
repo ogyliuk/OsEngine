@@ -20,7 +20,6 @@ namespace OsEngine.Robots.Oleg.Good
         private decimal _zoneDown;
         private decimal _balanceOnStart;
 
-        private MovingAverage _bollingerSma; // TODO : get rid of it and have only 1 indicator
         private BollingerWithSqueeze _bollingerWithSqueeze;
 
         private StrategyParameterInt BollingerLength;
@@ -49,12 +48,6 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
             ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
 
-            _bollingerSma = new MovingAverage(name + "BollingerSma", false);
-            _bollingerSma = (MovingAverage)_bot.CreateCandleIndicator(_bollingerSma, "Prime");
-            _bollingerSma.TypeCalculationAverage = MovingAverageTypeCalculation.Simple;
-            _bollingerSma.Lenght = BollingerLength.ValueInt;
-            _bollingerSma.Save();
-
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
             _bollingerWithSqueeze = (BollingerWithSqueeze)_bot.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
             _bollingerWithSqueeze.Lenght = BollingerLength.ValueInt;
@@ -79,13 +72,6 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void event_ParametersChangedByUser()
         {
-            if (_bollingerSma.Lenght != BollingerLength.ValueInt)
-            {
-                _bollingerSma.Lenght = BollingerLength.ValueInt;
-                _bollingerSma.Reload();
-                _bollingerSma.Save();
-            }
-
             if (_bollingerWithSqueeze.Lenght != BollingerLength.ValueInt ||
                 _bollingerWithSqueeze.Deviation != BollingerDeviation.ValueDecimal ||
                 _bollingerWithSqueeze.SqueezePeriod != BollingerSqueezeLength.ValueInt)
@@ -127,7 +113,7 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     if (IsFirstEntry())
                     {
-                        _zoneDown = _bollingerSma.Values.Last();
+                        _zoneDown = _bollingerWithSqueeze.ValuesSma.Last();
                     }                    
 
                     Set_TP_Order_LONG(p);
@@ -141,7 +127,7 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     if (IsFirstEntry())
                     {
-                        _zoneUp = _bollingerSma.Values.Last();
+                        _zoneUp = _bollingerWithSqueeze.ValuesSma.Last();
                     }
 
                     Set_TP_Order_SHORT(p);

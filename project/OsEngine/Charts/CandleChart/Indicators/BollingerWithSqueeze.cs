@@ -116,6 +116,13 @@ namespace OsEngine.Charts.CandleChart.Indicators
         { get; set; }
 
         /// <summary>
+        /// SMA line of bollinger
+        /// средняя линия боллинджера
+        /// </summary>
+        public List<decimal> ValuesSma
+        { get; set; }
+
+        /// <summary>
         /// bottom line of bollinger
         /// нижняя линия боллинджера
         /// </summary>
@@ -272,6 +279,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesUp.Clear();
                 ValuesDown.Clear();
+                ValuesSma.Clear();
                 ValuesBandsWidth.Clear();
                 ValuesSqueezeFlag.Clear();
             }
@@ -359,6 +367,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             {
                 ValuesUp = new List<decimal>();
                 ValuesDown = new List<decimal>();
+                ValuesSma = new List<decimal>();
                 ValuesBandsWidth = new List<decimal>();
                 ValuesSqueezeFlag = new List<decimal>();
             }
@@ -366,7 +375,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
             decimal[] value = GetValueSimple(candles, candles.Count - 1);
             ValuesUp.Add(value[0]);
             ValuesDown.Add(value[1]);
-            ValuesBandsWidth.Add(value[2]);
+            ValuesSma.Add(value[2]);
+            ValuesBandsWidth.Add(value[3]);
             decimal squeezeColumnUpperPoint = candles.Last().Low < ValuesDown.Last() ? candles.Last().Low : ValuesDown.Last();
             ValuesSqueezeFlag.Add(IsSqueezeCandle(candles.Count - 1) ? squeezeColumnUpperPoint : 0);
         }
@@ -383,6 +393,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             }
             ValuesUp = new List<decimal>();
             ValuesDown = new List<decimal>();
+            ValuesSma = new List<decimal>();
             ValuesBandsWidth = new List<decimal>();
             ValuesSqueezeFlag = new List<decimal>();
 
@@ -391,25 +402,10 @@ namespace OsEngine.Charts.CandleChart.Indicators
             for (int i = 0; i < candles.Count; i++)
             {
                 newValues[i] = GetValueSimple(candles, i);
-            }
-
-            for (int i = 0; i < candles.Count; i++)
-            {
                 ValuesUp.Add(newValues[i][0]);
-            }
-
-            for (int i = 0; i < candles.Count; i++)
-            {
                 ValuesDown.Add(newValues[i][1]);
-            }
-
-            for (int i = 0; i < candles.Count; i++)
-            {
-                ValuesBandsWidth.Add(newValues[i][2]);
-            }
-
-            for (int i = 0; i < candles.Count; i++)
-            {
+                ValuesSma.Add(newValues[i][2]);
+                ValuesBandsWidth.Add(newValues[i][3]);
                 decimal squeezeColumnUpperPoint = candles[i].Low < ValuesDown[i] ? candles[i].Low : ValuesDown[i];
                 ValuesSqueezeFlag.Add(IsSqueezeCandle(i) ? squeezeColumnUpperPoint : 0);
             }
@@ -428,7 +424,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
             decimal[] value = GetValueSimple(candles, candles.Count - 1);
             ValuesUp[ValuesUp.Count - 1] = value[0];
             ValuesDown[ValuesDown.Count - 1] = value[1];
-            ValuesBandsWidth[ValuesBandsWidth.Count - 1] = value[2];
+            ValuesSma[ValuesSma.Count - 1] = value[2];
+            ValuesBandsWidth[ValuesBandsWidth.Count - 1] = value[3];
             decimal squeezeColumnUpperPoint = candles.Last().Low < ValuesDown.Last() ? candles.Last().Low : ValuesDown.Last();
             ValuesSqueezeFlag[ValuesSqueezeFlag.Count - 1] = IsSqueezeCandle(candles.Count - 1) ? squeezeColumnUpperPoint : 0;
         }
@@ -441,16 +438,16 @@ namespace OsEngine.Charts.CandleChart.Indicators
         {
             if (index - Lenght <= 0)
             {
-                return new decimal[3];
+                return new decimal[4];
             }
 
-            decimal[] bollinger = new decimal[3];
+            decimal[] bollinger = new decimal[4];
             // 1 count SMA
             // 1 считаем СМА
 
             decimal valueSma = 0;
 
-            for (int i = index - Lenght + 1; i < index + 1; i++)
+            for (int i = index - Lenght + 1; i < index + 1; i++) // TODO : 11
             {
                 // running through past periods and collecting values
                 // бежим по прошлым периодам и собираем значения
@@ -463,7 +460,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             // find an array of deviations from mean
             // находим массив отклонений от средней
             decimal[] valueDev = new decimal[Lenght];
-            for (int i = index - Lenght + 1, i2 = 0; i < index + 1; i++, i2++)
+            for (int i = index - Lenght + 1, i2 = 0; i < index + 1; i++, i2++) // TODO : 22
             {
                 // running through past periods and collecting values
                 // бежим по прошлым периодам и собираем значения
@@ -471,7 +468,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             }
             // square this array
             // возводим этот массив в квадрат
-            for (int i = 0; i < valueDev.Length; i++)
+            for (int i = 0; i < valueDev.Length; i++) // TODO : 1
             {
                 valueDev[i] = Convert.ToDecimal(Math.Pow(Convert.ToDouble(valueDev[i]), 2));
             }
@@ -480,7 +477,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
             double summ = 0;
 
-            for (int i = 0; i < valueDev.Length; i++)
+            for (int i = 0; i < valueDev.Length; i++) // TODO : 2
             {
                 summ += Convert.ToDouble(valueDev[i]);
             }
@@ -503,7 +500,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
             bollinger[0] = Math.Round(valueSma + Convert.ToDecimal(summ) * Deviation, 6);
             bollinger[1] = Math.Round(valueSma - Convert.ToDecimal(summ) * Deviation, 6);
-            bollinger[2] = valueSma != 0 ? Math.Round((bollinger[0] - bollinger[1]) / valueSma, 6) : 0;
+            bollinger[2] = Math.Round(valueSma, 6);
+            bollinger[3] = valueSma != 0 ? Math.Round((bollinger[0] - bollinger[1]) / valueSma, 6) : 0;
 
             return bollinger;
         }
