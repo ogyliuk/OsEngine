@@ -50,6 +50,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
             HostColorUp.Child.BackColor = _bollingerWithSqueeze.ColorUp;
             HostColorDown.Child = new TextBox();
             HostColorDown.Child.BackColor = _bollingerWithSqueeze.ColorDown;
+            HostColorSma.Child = new TextBox();
+            HostColorSma.Child.BackColor = _bollingerWithSqueeze.ColorSma;
 
             CheckBoxPaintOnOff.IsChecked = _bollingerWithSqueeze.PaintOn;
 
@@ -87,6 +89,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             _bollingerWithSqueeze.ColorSqueeze = HostColorSqueeze.Child.BackColor;
             _bollingerWithSqueeze.ColorUp = HostColorUp.Child.BackColor;
             _bollingerWithSqueeze.ColorDown = HostColorDown.Child.BackColor;
+            _bollingerWithSqueeze.ColorSma = HostColorSma.Child.BackColor;
             _bollingerWithSqueeze.SqueezePeriod = Convert.ToInt32(TextBoxSqueezeLenght.Text);
             _bollingerWithSqueeze.Deviation = Convert.ToDecimal(TextBoxDeviation.Text);
             _bollingerWithSqueeze.Lenght = Convert.ToInt32(TextBoxLenght.Text);
@@ -135,6 +138,18 @@ namespace OsEngine.Charts.CandleChart.Indicators
             dialog.Color = HostColorDown.Child.BackColor;
             dialog.ShowDialog();
             HostColorDown.Child.BackColor = dialog.Color;
+        }
+
+        /// <summary>
+        /// middle line color button
+        /// кнопка цвет средней линии
+        /// </summary>
+        private void ButtonColorSma_Click(object sender, RoutedEventArgs e)
+        {
+            ColorDialog dialog = new ColorDialog();
+            dialog.Color = HostColorSma.Child.BackColor;
+            dialog.ShowDialog();
+            HostColorSma.Child.BackColor = dialog.Color;
         }
     }
 }

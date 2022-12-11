@@ -23,6 +23,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ColorSqueeze = Color.White;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
+            ColorSma = Color.Yellow;
             Lenght = 20;
             Deviation = 2;
             SqueezePeriod = 130;
@@ -44,6 +45,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ColorSqueeze = Color.White;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
+            ColorSma = Color.Yellow;
             Lenght = 20;
             Deviation = 2;
             SqueezePeriod = 130;
@@ -98,7 +100,19 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// list of elements which needs to be painted on the chart
         /// список элементов, которые должны быть отрисованы на чарте
         /// </summary>
-        public List<IndicatorElement> Elements { get { return new List<IndicatorElement>(); } }
+        public List<IndicatorElement> Elements
+        {
+            get
+            {
+                return new List<IndicatorElement>()
+                {
+                    new IndicatorElement(ColorUp, ValuesUp, IndicatorChartPaintType.Line),
+                    new IndicatorElement(ColorDown, ValuesDown, IndicatorChartPaintType.Line),
+                    new IndicatorElement(ColorSma, ValuesSma, IndicatorChartPaintType.Line),
+                    new IndicatorElement(ColorSqueeze, ValuesSqueezeFlag, IndicatorChartPaintType.Column)
+                };
+            }
+        }
 
         /// <summary>
         /// name of data series on which indicator will be drawn
@@ -192,6 +206,13 @@ namespace OsEngine.Charts.CandleChart.Indicators
         { get; set; }
 
         /// <summary>
+        /// color of moving average series
+        /// цвет средней серии данных
+        /// </summary>
+        public Color ColorSma
+        { get; set; }
+
+        /// <summary>
         /// color of bollinger bands squeeze data series
         /// цвет сужения
         /// </summary>
@@ -221,6 +242,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 {
                     ColorUp = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
                     ColorDown = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
+                    ColorSma = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
                     ColorSqueeze = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
                     Lenght = Convert.ToInt32(reader.ReadLine());
                     Deviation = Convert.ToDecimal(reader.ReadLine());
@@ -248,6 +270,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 {
                     writer.WriteLine(ColorUp.ToArgb());
                     writer.WriteLine(ColorDown.ToArgb());
+                    writer.WriteLine(ColorSma.ToArgb());
                     writer.WriteLine(ColorSqueeze.ToArgb());
                     writer.WriteLine(Lenght);
                     writer.WriteLine(Deviation);
