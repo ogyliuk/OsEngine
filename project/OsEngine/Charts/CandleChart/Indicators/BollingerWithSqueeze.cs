@@ -436,74 +436,39 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private decimal[] GetValueSimple(List<Candle> candles, int index)
         {
+            // Init
+            decimal[] bollingerValues = new decimal[4];
             if (index - Lenght <= 0)
             {
-                return new decimal[4];
+                return bollingerValues;
             }
 
-            decimal[] bollinger = new decimal[4];
-            // 1 count SMA
-            // 1 считаем СМА
-
-            decimal valueSma = 0;
-
-            for (int i = index - Lenght + 1; i < index + 1; i++) // TODO : 11
+            // SMA
+            decimal closePricesSum = 0;
+            for (int i = index - Lenght + 1; i < index + 1; i++)
             {
-                // running through past periods and collecting values
-                // бежим по прошлым периодам и собираем значения
-                valueSma += candles[i].Close;
+                closePricesSum += candles[i].Close;
             }
+            decimal valueSma = closePricesSum / Lenght;
 
-            valueSma = valueSma / Lenght;
-            // 2 count average deviation
-            // 2 считаем среднее отклонение
-            // find an array of deviations from mean
-            // находим массив отклонений от средней
-            decimal[] valueDev = new decimal[Lenght];
-            for (int i = index - Lenght + 1, i2 = 0; i < index + 1; i++, i2++) // TODO : 22
+            // Deviation
+            double deviationsSum = 0;
+            for (int i = index - Lenght + 1, j = 0; i < index + 1; i++, j++)
             {
-                // running through past periods and collecting values
-                // бежим по прошлым периодам и собираем значения
-                valueDev[i2] = candles[i].Close - valueSma;
+                deviationsSum += Math.Pow(Convert.ToDouble(candles[i].Close - valueSma), 2);
             }
-            // square this array
-            // возводим этот массив в квадрат
-            for (int i = 0; i < valueDev.Length; i++) // TODO : 1
-            {
-                valueDev[i] = Convert.ToDecimal(Math.Pow(Convert.ToDouble(valueDev[i]), 2));
-            }
-            // folding up
-            // складываем
+            double squareDeviation = Math.Sqrt(deviationsSum / Lenght);
 
-            double summ = 0;
+            // UP
+            bollingerValues[0] = Math.Round(valueSma + Convert.ToDecimal(squareDeviation) * Deviation, 6);
+            // DOWN
+            bollingerValues[1] = Math.Round(valueSma - Convert.ToDecimal(squareDeviation) * Deviation, 6);
+            // MA
+            bollingerValues[2] = Math.Round(valueSma, 6);
+            // WIDTH
+            bollingerValues[3] = valueSma != 0 ? Math.Round((bollingerValues[0] - bollingerValues[1]) / valueSma, 6) : 0;
 
-            for (int i = 0; i < valueDev.Length; i++) // TODO : 2
-            {
-                summ += Convert.ToDouble(valueDev[i]);
-            }
-            // divide amount by number of elements in sample( if on n-1,so if n> 30) 
-            //делим полученную сумму на количество элементов в выборке (или на n-1, если n>30)
-            if (Lenght > 30)
-            {
-                summ = summ / (Lenght - 1);
-            }
-            else
-            {
-                summ = summ / Lenght;
-            }
-            // calculating root.
-            // вычисляем корень
-
-            summ = Math.Sqrt(summ);
-            // 3 count bollinger lines
-            // 3 считаем линии боллинжера
-
-            bollinger[0] = Math.Round(valueSma + Convert.ToDecimal(summ) * Deviation, 6);
-            bollinger[1] = Math.Round(valueSma - Convert.ToDecimal(summ) * Deviation, 6);
-            bollinger[2] = Math.Round(valueSma, 6);
-            bollinger[3] = valueSma != 0 ? Math.Round((bollinger[0] - bollinger[1]) / valueSma, 6) : 0;
-
-            return bollinger;
+            return bollingerValues;
         }
 
         private bool IsSqueezeCandle(int candleIndex)
