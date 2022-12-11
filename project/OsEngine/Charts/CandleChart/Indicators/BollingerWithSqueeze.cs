@@ -8,7 +8,7 @@ using System.Linq;
 
 namespace OsEngine.Charts.CandleChart.Indicators
 {
-    public class BollingerWithSqueeze : IIndicator
+    public class BollingerWithSqueeze : IMultiElementIndicator
     {
         /// <summary>
         /// constructor
@@ -93,6 +93,12 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         public IndicatorChartPaintType TypeIndicator
         { get; set; }
+
+        /// <summary>
+        /// list of elements which needs to be painted on the chart
+        /// список элементов, которые должны быть отрисованы на чарте
+        /// </summary>
+        public List<IndicatorElement> Elements { get { return new List<IndicatorElement>(); } }
 
         /// <summary>
         /// name of data series on which indicator will be drawn

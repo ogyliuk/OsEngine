@@ -243,6 +243,7 @@
     <Compile Include="Charts\CandleChart\Indicators\ForceIndexUi.xaml.cs">
       <DependentUpon>ForceIndexUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Indicators\IndicatorElement.cs" />
     <Compile Include="Charts\CandleChart\Indicators\Ishimoku.cs" />
     <Compile Include="Charts\CandleChart\Indicators\IshimokuUi.xaml.cs">
       <DependentUpon>IshimokuUi.xaml</DependentUpon>
@@ -390,6 +391,7 @@
       <DependentUpon>AIndicatorUi.xaml</DependentUpon>
     </Compile>
     <Compile Include="Indicators\Entity.cs" />
+    <Compile Include="Indicators\IMultiElementIndicator.cs" />
     <Compile Include="Indicators\IndicatorParameter.cs" />
     <Compile Include="Indicators\IndicatorsFactory.cs" />
     <Compile Include="Indicators\ScriptSpells.cs" />
