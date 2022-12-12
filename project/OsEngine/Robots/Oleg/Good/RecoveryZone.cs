@@ -41,7 +41,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
-            VolumeMultiplier = CreateParameter("Volume multiplier", 0.75m, 0.25m, 1, 0.05m, "Base");
+            VolumeMultiplier = CreateParameter("Volume multiplier", 0.5m, 0.25m, 1, 0.05m, "Base");
             MinVolumeUSDT = CreateParameter("Min Volume USDT", 7m, 7m, 7m, 1m, "Base");
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
@@ -117,7 +117,7 @@ namespace OsEngine.Robots.Oleg.Good
                     }                    
 
                     Set_TP_Order_LONG(p);
-                    Set_SL_Order_LONG(p);
+                    Set_SL_Order_LONG(p); // TODO : rework to put at the target level
                     Set_EN_Order_SHORT();
 
                     _state = TradingState.LONG_ENTERED;
@@ -131,7 +131,7 @@ namespace OsEngine.Robots.Oleg.Good
                     }
 
                     Set_TP_Order_SHORT(p);
-                    Set_SL_Order_SHORT(p);
+                    Set_SL_Order_SHORT(p); // TODO : rework to put at the target level
                     Set_EN_Order_LONG();
 
                     _state = TradingState.SHORT_ENTERED;                    
