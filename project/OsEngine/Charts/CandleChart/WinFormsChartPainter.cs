@@ -2973,24 +2973,37 @@ namespace OsEngine.Charts.CandleChart
                     return;
                 }
 
+                IMultiElementIndicator multiElementIndicator = indicator as IMultiElementIndicator;
+                bool isMultiElementIndicator = indicator.TypeIndicator == IndicatorChartPaintType.MultiElement && multiElementIndicator != null;
 
-                if (indicator.ValuesToChart != null)
+                if (indicator.ValuesToChart != null || isMultiElementIndicator)
                 {
                     if (indicator.PaintOn == false)
                     {
-                        List<List<decimal>> values = indicator.ValuesToChart;
-
-
-                        for (int i = 0; i < values.Count; i++)
+                        if (indicator.ValuesToChart != null)
                         {
-                            Series mySeries = FindSeriesByNameSafe(indicator.Name + i);
-
-                            if (mySeries != null && mySeries.Points.Count != 0)
+                            for (int i = 0; i < indicator.ValuesToChart.Count; i++)
                             {
-                                ClearIndicatorSeries(mySeries);
+                                Series mySeries = FindSeriesByNameSafe(indicator.Name + i);
+                                if (mySeries != null && mySeries.Points.Count != 0)
+                                {
+                                    ClearIndicatorSeries(mySeries);
+                                }
                             }
                         }
 
+                        if (isMultiElementIndicator)
+                        {
+                            for (int i = 0; i < multiElementIndicator.Elements.Count; i++)
+                            {
+                                IndicatorElement indicatorElement = multiElementIndicator.Elements[i];
+                                Series mySeries = FindSeriesByNameSafe(indicator.Name + i);
+                                if (mySeries != null && mySeries.Points.Count != 0)
+                                {
+                                    ClearIndicatorSeries(mySeries);
+                                }
+                            }
+                        }
 
                         return;
                     }
@@ -3023,6 +3036,25 @@ namespace OsEngine.Charts.CandleChart
                         for (int i = 0; i < valList.Count; i++)
                         {
                             PaintLikePoint(valList[i], colors[i], name + i, false);
+                        }
+                    }
+                    if (isMultiElementIndicator)
+                    {
+                        for (int i = 0; i < multiElementIndicator.Elements.Count; i++)
+                        {
+                            IndicatorElement indicatorElement = multiElementIndicator.Elements[i];
+                            switch (indicatorElement.Type)
+                            {
+                                case IndicatorChartPaintType.Line:
+                                    PaintLikeLine(indicatorElement.ValuesToChart, indicatorElement.Color, indicator.Name + i, false);
+                                    break;
+                                case IndicatorChartPaintType.Column:
+                                    PaintLikeColumn(indicatorElement.ValuesToChart, indicatorElement.Color, indicatorElement.Color, indicator.Name + i, false);
+                                    break;
+                                case IndicatorChartPaintType.Point:
+                                    PaintLikePoint(indicatorElement.ValuesToChart, indicatorElement.Color, indicator.Name + i, false);
+                                    break;
+                            }
                         }
                     }
                 }

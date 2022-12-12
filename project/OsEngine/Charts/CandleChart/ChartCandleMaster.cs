@@ -907,20 +907,45 @@ namespace OsEngine.Charts.CandleChart
 
             List<List<decimal>> values = indicator.ValuesToChart;
 
-            if (values != null)
+            IMultiElementIndicator multiElementIndicator = indicator as IMultiElementIndicator;
+            bool isMultiElementIndicator = indicator.TypeIndicator == IndicatorChartPaintType.MultiElement && multiElementIndicator != null;
+
+            if (values != null || isMultiElementIndicator)
             { // прогружаем классические индикаторы
-                for (int i = 0; i < values.Count; i++)
+                if (values != null)
                 {
-                    if (inNewArea == false)
+                    for (int i = 0; i < values.Count; i++)
                     {
-                        indicator.NameSeries = ChartCandle.CreateSeries(nameArea,
-                            indicator.TypeIndicator, indicator.Name + i);
+                        if (inNewArea == false)
+                        {
+                            indicator.NameSeries = ChartCandle.CreateSeries(nameArea,
+                                indicator.TypeIndicator, indicator.Name + i);
+                        }
+                        else
+                        {
+                            string area = ChartCandle.CreateArea(nameArea, 15);
+                            indicator.NameSeries = ChartCandle.CreateSeries(area,
+                                indicator.TypeIndicator, indicator.Name + i);
+                        }
                     }
-                    else
+                }
+
+                if (isMultiElementIndicator)
+                {
+                    for (int i = 0; i < multiElementIndicator.Elements.Count; i++)
                     {
-                        string area = ChartCandle.CreateArea(nameArea, 15);
-                        indicator.NameSeries = ChartCandle.CreateSeries(area,
-                            indicator.TypeIndicator, indicator.Name + i);
+                        IndicatorElement indicatorElement = multiElementIndicator.Elements[i];
+                        if (inNewArea == false)
+                        {
+                            indicator.NameSeries = ChartCandle.CreateSeries(nameArea,
+                                indicatorElement.Type, indicator.Name + i);
+                        }
+                        else
+                        {
+                            string area = ChartCandle.CreateArea(nameArea, 15);
+                            indicator.NameSeries = ChartCandle.CreateSeries(area,
+                                indicatorElement.Type, indicator.Name + i);
+                        }
                     }
                 }
             }
