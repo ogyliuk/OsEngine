@@ -130,6 +130,11 @@ namespace OsEngine.Indicators
         /// Point
         /// Точка
         /// </summary>
-        Point
+        Point,
+        /// <summary>
+        /// Multiple elements on chart
+        /// Несколько элементов на чарте
+        /// </summary>
+        MultiElement
     }
 }

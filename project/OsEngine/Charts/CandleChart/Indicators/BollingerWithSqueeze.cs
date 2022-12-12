@@ -19,7 +19,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public BollingerWithSqueeze(string uniqName, bool canDelete)
         {
             Name = uniqName;
-            TypeIndicator = IndicatorChartPaintType.Column;
+            TypeIndicator = IndicatorChartPaintType.MultiElement;
             ColorSqueeze = Color.White;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
@@ -41,7 +41,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public BollingerWithSqueeze(bool canDelete)
         {
             Name = Guid.NewGuid().ToString();
-            TypeIndicator = IndicatorChartPaintType.Column;
+            TypeIndicator = IndicatorChartPaintType.MultiElement;
             ColorSqueeze = Color.White;
             ColorUp = Color.DodgerBlue;
             ColorDown = Color.DarkRed;
@@ -58,30 +58,14 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// все значения индикатора
         /// </summary>
         List<List<decimal>> IIndicator.ValuesToChart
-        {
-            get
-            {
-                List<List<decimal>> list = new List<List<decimal>>();
-                list.Add(ValuesSqueezeFlag);
-                return list;
-            }
-        }
+        { get; }
 
         /// <summary>
         /// indicator colors
         /// цвета для индикатора
         /// </summary>
         List<Color> IIndicator.Colors
-        {
-            get
-            {
-                List<Color> colors = new List<Color>();
-                colors.Add(ColorSqueeze);
-                colors.Add(ColorSqueeze);
-                return colors;
-            }
-
-        }
+        { get; }
 
         /// <summary>
         /// whether indicator can be removed from chart. This is necessary so that robots can't be removed /можно ли удалить индикатор с графика. Это нужно для того чтобы у роботов нельзя было удалить 
