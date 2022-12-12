@@ -2952,7 +2952,7 @@ namespace OsEngine.Charts.CandleChart
         /// <param name="indicator">indicator/индикатор</param>
         private void PaintIndicator(IIndicator indicator)
         {
-            if (_mouseDown == true)
+            if (_mouseDown)
             {
                 return;
             }
@@ -3097,40 +3097,25 @@ namespace OsEngine.Charts.CandleChart
         /// добавить индикатор в прорисовку
         /// </summary>
         /// <param name="indicator">indicator/индикатор</param>
-        public void ProcessIndicator(IIndicator indicator) // TODO : optimize
+        public void ProcessIndicator(IIndicator indicator)
         {
-            OlegUtils.Log("st ProcessIndicator = " + indicator.Name);
-            if ((_startProgram == StartProgram.IsTester
-                || _startProgram == StartProgram.IsOsMiner ||
-                IsPatternChart)
-            &&
-                _host != null)
+            bool testerOrOsMiner = _startProgram == StartProgram.IsTester || _startProgram == StartProgram.IsOsMiner;
+
+            if (_host != null && (testerOrOsMiner || IsPatternChart))
             {
                 PaintIndicator(indicator);
                 ReloadAreaSizes();
                 ResizeYAxisOnArea("Prime");
             }
-            else
+            else if (_indicatorsToPaint != null)
             {
-                if (_indicatorsToPaint != null &&
-                    _indicatorsToPaint.IsEmpty == false
-                    &&
-                    _indicatorsToPaint.Count > 25)
+                IIndicator res;
+                while (!_indicatorsToPaint.IsEmpty && _indicatorsToPaint.Count > 25)
                 {
-                    IIndicator res;
-
-                    while (_indicatorsToPaint.IsEmpty == false &&
-                           _indicatorsToPaint.Count > 25)
-
-                        _indicatorsToPaint.TryDequeue(out res);
+                    _indicatorsToPaint.TryDequeue(out res);
                 }
-
-                if(_indicatorsToPaint != null)
-                {
-                    _indicatorsToPaint.Enqueue(indicator);
-                }
+                _indicatorsToPaint.Enqueue(indicator);
             }
-            OlegUtils.Log("en ProcessIndicator = " + indicator.Name);
         }
 
         /// <summary>
@@ -3318,18 +3303,15 @@ namespace OsEngine.Charts.CandleChart
         /// </summary>
         private void PaintLikeLine(List<decimal> values, Color color, string nameSeries,bool fullReloadOnNewCandle)
         {
-            if (values == null ||
-                values.Count == 0)
+            Series mySeries = FindSeriesByNameSafe(nameSeries);
+            if (mySeries == null)
             {
-                Series needClearSeries = FindSeriesByNameSafe(nameSeries);
-                needClearSeries?.Points.Clear();
                 return;
             }
 
-            Series mySeries = FindSeriesByNameSafe(nameSeries);
-
-            if (mySeries == null)
+            if (values == null || values.Count == 0)
             {
+                mySeries.Points.Clear();
                 return;
             }
 
