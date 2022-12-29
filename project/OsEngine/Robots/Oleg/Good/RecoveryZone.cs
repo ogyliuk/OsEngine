@@ -113,11 +113,12 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     if (IsFirstEntry())
                     {
+                        _bot.SellAtStopCancel();
                         _zoneDown = _bollingerWithSqueeze.ValuesSma.Last();
                     }                    
 
                     Set_TP_Order_LONG(p);
-                    Set_SL_Order_LONG(p); // TODO : rework to put at the target level
+                    Set_SL_Order_LONG(p);
                     Set_EN_Order_SHORT();
 
                     _state = TradingState.LONG_ENTERED;
@@ -127,11 +128,12 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     if (IsFirstEntry())
                     {
+                        _bot.BuyAtStopCancel();
                         _zoneUp = _bollingerWithSqueeze.ValuesSma.Last();
                     }
 
                     Set_TP_Order_SHORT(p);
-                    Set_SL_Order_SHORT(p); // TODO : rework to put at the target level
+                    Set_SL_Order_SHORT(p);
                     Set_EN_Order_LONG();
 
                     _state = TradingState.SHORT_ENTERED;                    
@@ -143,42 +145,44 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (p != null && p.State == PositionStateType.Done)
             {
-                _state = TradingState.FREE;
-                LogPositionResults(p);
+                if (_bot.PositionsOpenAll.Count == 0)
+                {
+                    _bot.BuyAtStopCancel();
+                    _bot.SellAtStopCancel();
+                    _state = TradingState.FREE;
+                }
+
+                // TODO : uncomment this logging
+                // LogPositionResults(p);
             }
         }
 
         private void Set_TP_Order_LONG(Position p)
         {
-            decimal SL_price = _zoneDown;
-            decimal SL_size = p.EntryPrice - SL_price;
-            decimal TP_price = p.EntryPrice + SL_size * ProfitSizeFromRZ.ValueDecimal;
+            decimal TP_price = Calc_TP_Price_LONG(p.EntryPrice);
             _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
         }
 
         private void Set_TP_Order_SHORT(Position p)
         {
-            decimal SL_price = _zoneUp;
-            decimal SL_size = SL_price - p.EntryPrice;
-            decimal TP_price = p.EntryPrice - SL_size * ProfitSizeFromRZ.ValueDecimal;
+            decimal TP_price = Calc_TP_Price_SHORT(p.EntryPrice);
             _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
         }
 
         private void Set_SL_Order_LONG(Position p)
         {
-            decimal SL_price = _zoneDown;
+            decimal SL_price = Calc_TP_Price_SHORT(_zoneDown);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_SL_Order_SHORT(Position p)
         {
-            decimal SL_price = _zoneUp;
+            decimal SL_price = Calc_TP_Price_LONG(_zoneUp);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_EN_Order_LONG()
         {
-            _bot.BuyAtStopCancel();
             decimal buyCoinsVolume = GetNewAttemptCoinsVolume(Side.Buy);
             if (buyCoinsVolume > 0)
             {
@@ -188,12 +192,25 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order_SHORT()
         {
-            _bot.SellAtStopCancel();
             decimal sellCoinsVolume = GetNewAttemptCoinsVolume(Side.Sell);
             if (sellCoinsVolume > 0)
             {
                 _bot.SellAtStop(sellCoinsVolume, _zoneDown, _zoneDown, StopActivateType.LowerOrEqyal, 100);
             }
+        }
+
+        private decimal Calc_TP_Price_LONG(decimal entryPrice)
+        {
+            decimal SL_price = _zoneDown;
+            decimal SL_size = entryPrice - SL_price;
+            return entryPrice + SL_size * ProfitSizeFromRZ.ValueDecimal;
+        }
+
+        private decimal Calc_TP_Price_SHORT(decimal entryPrice)
+        {
+            decimal SL_price = _zoneUp;
+            decimal SL_size = SL_price - entryPrice;
+            return entryPrice - SL_size * ProfitSizeFromRZ.ValueDecimal;
         }
 
         private bool IsFirstEntry()
