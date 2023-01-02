@@ -41,12 +41,12 @@ namespace OsEngine.Robots.Oleg.Good
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
-            VolumeMultiplier = CreateParameter("Volume multiplier", 0.5m, 0.25m, 1, 0.05m, "Base");
+            VolumeMultiplier = CreateParameter("Volume multiplier", 0.6m, 0.25m, 1, 0.05m, "Base");
             MinVolumeUSDT = CreateParameter("Min Volume USDT", 7m, 7m, 7m, 1m, "Base");
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
-            ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 2m, 0.5m, 3, 0.5m, "Base");
+            ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 0.25m, 0.2m, 3, 0.2m, "Base");
 
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
             _bollingerWithSqueeze = (BollingerWithSqueeze)_bot.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
@@ -97,6 +97,7 @@ namespace OsEngine.Robots.Oleg.Good
                     _balanceOnStart = _bot.Portfolio.ValueCurrent;
 
                     decimal squeezeSize = _bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last();
+                    // TODO : play with that: squeezeSize = squeezeSize / 2;
                     _zoneUp = _bollingerWithSqueeze.ValuesUp.Last() + squeezeSize / 2;
                     _zoneDown = _bollingerWithSqueeze.ValuesDown.Last() - squeezeSize / 2;
                     Set_EN_Order_LONG();
