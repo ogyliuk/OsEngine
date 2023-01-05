@@ -3519,6 +3519,22 @@ namespace OsEngine.Market.Servers.Tester
         /// </summary>
         void TesterServer_NewTradesEvent(List<Trade> tradesNew)
         {
+            // tradesNew - Все трейды, которые влазят в 1 секунду
+            if (this._allTrades != null && this._allTrades[0].Count > 0)
+            {
+                for (int i = this._allTrades[0].Count - 1; i >= 1001; i--)
+                {
+                    if (this._allTrades[0][i] != null)
+                    {
+                        this._allTrades[0][i] = null;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+
             if (_dataIsActive == false)
             {
                 _dataIsActive = true;
