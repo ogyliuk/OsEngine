@@ -3638,72 +3638,58 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// </summary>
         private void CheckStopOpener(decimal price)
         {
-            if (ServerStatus != ServerConnectStatus.Connect ||
-                Securiti == null || Portfolio == null)
-            {
-                return;
-            }
-
             try
             {
-                for (int i = 0;
-                    i > -1 && _stopsOpener != null && _stopsOpener.Count != 0 && i < _stopsOpener.Count;
-                    i++)
+                if (Securiti != null && Portfolio != null && ServerStatus == ServerConnectStatus.Connect)
                 {
-                    if ((_stopsOpener[i].ActivateType == StopActivateType.HigherOrEqual &&
-                         price >= _stopsOpener[i].PriceRedLine)
-                        ||
-                        (_stopsOpener[i].ActivateType == StopActivateType.LowerOrEqyal &&
-                         price <= _stopsOpener[i].PriceRedLine))
+                    for (int i = 0;
+                        i > -1 && _stopsOpener != null && _stopsOpener.Count > 0 && i < _stopsOpener.Count;
+                        i++)
                     {
-                        if (_stopsOpener[i].Side == Side.Buy)
+                        PositionOpenerToStop opener = _stopsOpener[i];
+                        Side side = opener.Side;
+                        decimal volume = opener.Volume;
+                        string signalType = opener.SignalType;
+                        decimal priceOrder = opener.PriceOrder;
+                        decimal priceRedLine = opener.PriceRedLine;
+                        StopActivateType activateType = opener.ActivateType;
+
+                        if ((activateType == StopActivateType.HigherOrEqual && price >= priceRedLine) ||
+                            (activateType == StopActivateType.LowerOrEqyal && price <= priceRedLine))
                         {
-                            PositionOpenerToStop opener = _stopsOpener[i];
-                            Position pos = LongCreate(_stopsOpener[i].PriceOrder, _stopsOpener[i].Volume, OrderPriceType.Limit,
-                                ManualPositionSupport.SecondToOpen, true);
-
-                            if (pos != null 
-                                && !string.IsNullOrEmpty(opener.SignalType))
+                            Position p = side == Side.Buy ?
+                                LongCreate(priceOrder, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, true) :
+                                ShortCreate(priceOrder, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, true);
+                            if (p != null)
                             {
-                                pos.SignalTypeOpen = opener.SignalType;
-                            }
+                                if (!String.IsNullOrEmpty(signalType))
+                                {
+                                    p.SignalTypeOpen = signalType;
+                                }
 
-                            if (_stopsOpener.Count == 0)
-                            { // пользователь может удалить сам из слоя увидив что сделка открыается
-                                return;
-                            }
+                                _stopsOpener.Remove(opener);
+                                i = -1;
 
-                            _stopsOpener.Remove(opener);
-                            i = -1;
-                            if (PositionBuyAtStopActivateEvent != null && pos != null)
-                            { PositionBuyAtStopActivateEvent(pos); }
-                            continue;
+                                if (side == Side.Buy)
+                                {
+                                    if (PositionBuyAtStopActivateEvent != null)
+                                    {
+                                        PositionBuyAtStopActivateEvent(p);
+                                    }
+                                }
+                                else if (side == Side.Sell)
+                                {
+                                    if (PositionSellAtStopActivateEvent != null)
+                                    {
+                                        PositionSellAtStopActivateEvent(p);
+                                    }
+                                }
+                                else
+                                {
+                                    i--;
+                                }
+                            }
                         }
-                        else if (_stopsOpener[i].Side == Side.Sell)
-                        {
-                            PositionOpenerToStop opener = _stopsOpener[i];
-                            Position pos = ShortCreate(_stopsOpener[i].PriceOrder, _stopsOpener[i].Volume, OrderPriceType.Limit,
-                                ManualPositionSupport.SecondToOpen, true);
-
-                            if (pos != null
-                                && !string.IsNullOrEmpty(opener.SignalType))
-                            {
-                                pos.SignalTypeOpen = opener.SignalType;
-                            }
-
-                            if (_stopsOpener.Count == 0)
-                            { // пользователь может удалить сам из слоя увидив что сделка открыается
-                                return;
-                            }
-
-                            _stopsOpener.Remove(opener);
-                            i = -1;
-
-                            if (PositionSellAtStopActivateEvent != null && pos != null)
-                            { PositionSellAtStopActivateEvent(pos); }
-                            continue;
-                        }
-                        i--;
                     }
                 }
             }
@@ -4194,8 +4180,23 @@ namespace OsEngine.OsTrader.Panels.Tab
                 }
             }
 
-            List<Position> openPositions = _journal.OpenPositions;
+            for (int i2 = 0; i2 < newTrades.Count; i2++)
+            {
+                CheckStopOpener(newTrades[i2].Price);
+                if (NewTickEvent != null)
+                {
+                    try
+                    {
+                        NewTickEvent(newTrades[i2]);
+                    }
+                    catch (Exception error)
+                    {
+                        SetNewLogMessage(error.ToString(), LogMessageType.Error);
+                    }
+                }
+            }
 
+            List<Position> openPositions = _journal.OpenPositions;
             if (openPositions != null)
             {
                 for (int i = 0; i < openPositions.Count; i++)
@@ -4211,24 +4212,6 @@ namespace OsEngine.OsTrader.Panels.Tab
                             break;
                         }
                     }
-                }
-            }
-
-            for (int i2 = 0; i2 < newTrades.Count; i2++)
-            {
-                CheckStopOpener(newTrades[i2].Price);
-
-                if (NewTickEvent != null)
-                {
-                    try
-                    {
-                        NewTickEvent(newTrades[i2]);
-                    }
-                    catch (Exception error)
-                    {
-                        SetNewLogMessage(error.ToString(), LogMessageType.Error);
-                    }
-
                 }
             }
 
