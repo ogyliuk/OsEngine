@@ -96,10 +96,8 @@ namespace OsEngine.Robots.Oleg.Good
                     _state = TradingState.SQUEEZE_FOUND;
                     _balanceOnStart = _bot.Portfolio.ValueCurrent;
 
-                    decimal squeezeSize = _bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last();
-                    // TODO : play with that: squeezeSize = squeezeSize / 2;
-                    _zoneUp = _bollingerWithSqueeze.ValuesUp.Last() + squeezeSize / 2;
-                    _zoneDown = _bollingerWithSqueeze.ValuesDown.Last() - squeezeSize / 2;
+                    _zoneUp = _bollingerWithSqueeze.ValuesUp.Last();
+                    _zoneDown = _bollingerWithSqueeze.ValuesDown.Last();
                     Set_EN_Order_LONG();
                     Set_EN_Order_SHORT();
                 }
@@ -202,16 +200,16 @@ namespace OsEngine.Robots.Oleg.Good
 
         private decimal Calc_TP_Price_LONG(decimal entryPrice)
         {
-            decimal SL_price = _zoneDown;
-            decimal SL_size = entryPrice - SL_price;
-            return entryPrice + SL_size * ProfitSizeFromRZ.ValueDecimal;
+            decimal zoneSize = _zoneUp - _zoneDown;
+            decimal TP_size = zoneSize * ProfitSizeFromRZ.ValueDecimal;
+            return entryPrice + TP_size;
         }
 
         private decimal Calc_TP_Price_SHORT(decimal entryPrice)
         {
-            decimal SL_price = _zoneUp;
-            decimal SL_size = SL_price - entryPrice;
-            return entryPrice - SL_size * ProfitSizeFromRZ.ValueDecimal;
+            decimal zoneSize = _zoneUp - _zoneDown;
+            decimal TP_size = zoneSize * ProfitSizeFromRZ.ValueDecimal;
+            return entryPrice - TP_size;
         }
 
         private bool IsFirstEntry()
