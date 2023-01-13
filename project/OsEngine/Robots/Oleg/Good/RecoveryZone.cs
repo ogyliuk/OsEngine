@@ -46,6 +46,7 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
+            // TODO : set size not from RZ but from squeeze size and put 1.8 as a best one for 1m TF (also good are: 0.8 and 1.7)
             ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 0.25m, 0.2m, 3, 0.2m, "Base");
 
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
@@ -170,13 +171,15 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_SL_Order_LONG(Position p)
         {
-            decimal SL_price = Calc_TP_Price_SHORT(_zoneDown);
+            // TODO : uncomment - decimal SL_price = Calc_TP_Price_SHORT(_zoneDown);
+            decimal SL_price = _zoneDown;
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_SL_Order_SHORT(Position p)
         {
-            decimal SL_price = Calc_TP_Price_LONG(_zoneUp);
+            // TODO : uncomment - decimal SL_price = Calc_TP_Price_LONG(_zoneUp);
+            decimal SL_price = _zoneUp;
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
