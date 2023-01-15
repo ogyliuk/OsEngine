@@ -4180,6 +4180,30 @@ namespace OsEngine.OsTrader.Panels.Tab
                 }
             }
 
+            bool tradesMode = newTrades != null && newTrades.Count > 0 && newTrades[0].Id != null;
+            if (tradesMode)
+            {
+                ProcessStopOpeners(newTrades);
+                ProcessStops(newTrades);
+            }
+            else
+            {
+                ProcessStops(newTrades);
+                ProcessStopOpeners(newTrades);
+            }
+
+            _lastTradeIndex = trades.Count;
+            _lastTradeTime = newTrades[newTrades.Count - 1].Time;
+
+            if (StartProgram == StartProgram.IsOsTrader)
+            {
+                CheckSurplusPositions();
+            }
+
+        }
+
+        private void ProcessStopOpeners(List<Trade> newTrades)
+        {
             for (int i2 = 0; i2 < newTrades.Count; i2++)
             {
                 CheckStopOpener(newTrades[i2].Price);
@@ -4195,7 +4219,10 @@ namespace OsEngine.OsTrader.Panels.Tab
                     }
                 }
             }
+        }
 
+        private void ProcessStops(List<Trade> newTrades)
+        {
             List<Position> openPositions = _journal.OpenPositions;
             if (openPositions != null)
             {
@@ -4214,16 +4241,6 @@ namespace OsEngine.OsTrader.Panels.Tab
                     }
                 }
             }
-
-            _lastTradeIndex = trades.Count;
-
-            _lastTradeTime = newTrades[newTrades.Count - 1].Time;
-
-            if (StartProgram == StartProgram.IsOsTrader)
-            {
-                CheckSurplusPositions();
-            }
-
         }
 
         /// <summary>
