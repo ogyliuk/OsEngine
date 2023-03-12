@@ -19,6 +19,7 @@ namespace OsEngine.Robots.Oleg.Good
         private decimal _zoneUp;
         private decimal _zoneDown;
         private decimal _balanceOnStart;
+        private decimal _squeezeSize;
 
         private BollingerWithSqueeze _bollingerWithSqueeze;
 
@@ -31,7 +32,8 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
 
-        private StrategyParameterDecimal ProfitSizeFromRZ;
+        private StrategyParameterDecimal RiskZoneInSqueezes;
+        private StrategyParameterDecimal ProfitInSqueezes;
 
         public RecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
@@ -46,8 +48,9 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
-            // TODO : set size not from RZ but from squeeze size and put 1.8 as a best one for 1m TF (also good are: 0.8 and 1.7)
-            ProfitSizeFromRZ = CreateParameter("Profit size from RZ", 0.25m, 0.2m, 3, 0.2m, "Base");
+
+            RiskZoneInSqueezes = CreateParameter("RiskZone in SQUEEZEs", 0.5m, 0.1m, 2, 0.1m, "Base");
+            ProfitInSqueezes = CreateParameter("Profit in SQUEEZEs", 0.5m, 0.1m, 2, 0.1m, "Base");
 
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
             _bollingerWithSqueeze = (BollingerWithSqueeze)_bot.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
@@ -96,6 +99,7 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     _state = TradingState.SQUEEZE_FOUND;
                     _balanceOnStart = _bot.Portfolio.ValueCurrent;
+                    _squeezeSize = _bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last();
 
                     _zoneUp = _bollingerWithSqueeze.ValuesUp.Last();
                     _zoneDown = _bollingerWithSqueeze.ValuesDown.Last();
@@ -114,7 +118,7 @@ namespace OsEngine.Robots.Oleg.Good
                     if (IsFirstEntry())
                     {
                         _bot.SellAtStopCancel();
-                        _zoneDown = _bollingerWithSqueeze.ValuesSma.Last();
+                        _zoneDown = p.EntryPrice - _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
                     }                    
 
                     Set_TP_Order_LONG(p);
@@ -129,7 +133,7 @@ namespace OsEngine.Robots.Oleg.Good
                     if (IsFirstEntry())
                     {
                         _bot.BuyAtStopCancel();
-                        _zoneUp = _bollingerWithSqueeze.ValuesSma.Last();
+                        _zoneUp = p.EntryPrice + _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
                     }
 
                     Set_TP_Order_SHORT(p);
@@ -171,15 +175,13 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_SL_Order_LONG(Position p)
         {
-            // TODO : uncomment - decimal SL_price = Calc_TP_Price_SHORT(_zoneDown);
-            decimal SL_price = _zoneDown;
+            decimal SL_price = Calc_TP_Price_SHORT(_zoneDown);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_SL_Order_SHORT(Position p)
         {
-            // TODO : uncomment - decimal SL_price = Calc_TP_Price_LONG(_zoneUp);
-            decimal SL_price = _zoneUp;
+            decimal SL_price = Calc_TP_Price_LONG(_zoneUp);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
@@ -203,15 +205,13 @@ namespace OsEngine.Robots.Oleg.Good
 
         private decimal Calc_TP_Price_LONG(decimal entryPrice)
         {
-            decimal zoneSize = _zoneUp - _zoneDown;
-            decimal TP_size = zoneSize * ProfitSizeFromRZ.ValueDecimal;
+            decimal TP_size = _squeezeSize * ProfitInSqueezes.ValueDecimal;
             return entryPrice + TP_size;
         }
 
         private decimal Calc_TP_Price_SHORT(decimal entryPrice)
         {
-            decimal zoneSize = _zoneUp - _zoneDown;
-            decimal TP_size = zoneSize * ProfitSizeFromRZ.ValueDecimal;
+            decimal TP_size = _squeezeSize * ProfitInSqueezes.ValueDecimal;
             return entryPrice - TP_size;
         }
 
