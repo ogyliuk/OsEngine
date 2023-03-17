@@ -12,14 +12,13 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("RecoveryZone")]
     public class RecoveryZone : BotPanel
     {
-        private static readonly bool LOGGING_ENABLED = false;
-
         private BotTabSimple _bot;
         private TradingState _state;
         private decimal _zoneUp;
         private decimal _zoneDown;
         private decimal _balanceOnStart;
         private decimal _squeezeSize;
+        private int _dealAttemptsCounter;
 
         private BollingerWithSqueeze _bollingerWithSqueeze;
 
@@ -32,6 +31,8 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
 
+        private StrategyParameterBool RecoveryEnabled;
+        private StrategyParameterBool PositionResultsLoggingEnabled;
         private StrategyParameterDecimal RiskZoneInSqueezes;
         private StrategyParameterDecimal ProfitInSqueezes;
 
@@ -40,6 +41,7 @@ namespace OsEngine.Robots.Oleg.Good
             TabCreate(BotTabType.Simple);
             _bot = TabsSimple[0];
             _state = TradingState.FREE;
+            _dealAttemptsCounter = 0;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
@@ -49,8 +51,10 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
 
-            RiskZoneInSqueezes = CreateParameter("RiskZone in SQUEEZEs", 0.5m, 0.1m, 2, 0.1m, "Base");
-            ProfitInSqueezes = CreateParameter("Profit in SQUEEZEs", 0.5m, 0.1m, 2, 0.1m, "Base");
+            RecoveryEnabled = CreateParameter("Recovery enabled", true, "Base");
+            PositionResultsLoggingEnabled = CreateParameter("Log position results", false, "Base");
+            RiskZoneInSqueezes = CreateParameter("RiskZone in SQUEEZEs", 2.9m, 0.1m, 10, 0.1m, "Base");
+            ProfitInSqueezes = CreateParameter("Profit in SQUEEZEs", 2.8m, 0.1m, 10, 0.1m, "Base");
 
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
             _bollingerWithSqueeze = (BollingerWithSqueeze)_bot.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
@@ -113,6 +117,8 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (p != null && p.State == PositionStateType.Open)
             {
+                _dealAttemptsCounter++;
+
                 if (p.Direction == Side.Buy)
                 {
                     if (IsFirstEntry())
@@ -123,7 +129,10 @@ namespace OsEngine.Robots.Oleg.Good
 
                     Set_TP_Order_LONG(p);
                     Set_SL_Order_LONG(p);
-                    Set_EN_Order_SHORT();
+                    if (RecoveryEnabled.ValueBool)
+                    {
+                        Set_EN_Order_SHORT();
+                    }
 
                     _state = TradingState.LONG_ENTERED;
                 }
@@ -138,7 +147,10 @@ namespace OsEngine.Robots.Oleg.Good
 
                     Set_TP_Order_SHORT(p);
                     Set_SL_Order_SHORT(p);
-                    Set_EN_Order_LONG();
+                    if (RecoveryEnabled.ValueBool)
+                    {
+                        Set_EN_Order_LONG();
+                    }
 
                     _state = TradingState.SHORT_ENTERED;                    
                 }
@@ -154,10 +166,13 @@ namespace OsEngine.Robots.Oleg.Good
                     _bot.BuyAtStopCancel();
                     _bot.SellAtStopCancel();
                     _state = TradingState.FREE;
+                    _dealAttemptsCounter = 0;
                 }
 
-                // TODO : uncomment this logging
-                // LogPositionResults(p);
+                if (PositionResultsLoggingEnabled.ValueBool)
+                {
+                    LogPositionResults(p);
+                }
             }
         }
 
@@ -175,13 +190,13 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_SL_Order_LONG(Position p)
         {
-            decimal SL_price = Calc_TP_Price_SHORT(_zoneDown);
+            decimal SL_price = RecoveryEnabled.ValueBool ? Calc_TP_Price_SHORT(_zoneDown) : _zoneDown;
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_SL_Order_SHORT(Position p)
         {
-            decimal SL_price = Calc_TP_Price_LONG(_zoneUp);
+            decimal SL_price = RecoveryEnabled.ValueBool ? Calc_TP_Price_LONG(_zoneUp) : _zoneUp;
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
@@ -280,25 +295,22 @@ namespace OsEngine.Robots.Oleg.Good
 
         private static void LogPositionResults(Position p)
         {
-            if (LOGGING_ENABLED)
-            {
-                OlegUtils.Log("\n#{0} {1}\n\tvolume = {2}\n\topen price = {3}\n\tclose price = {4}\n\tfee = {5}% = {6}$" +
-                    "\n\tprice change = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$",
-                    p.Number,
-                    p.Direction,
-                    p.OpenOrders.First().Volume,
-                    p.EntryPrice,
-                    p.ClosePrice,
-                    p.ComissionValue,
-                    Math.Round(p.CommissionTotal(), 2),
-                    Math.Round(p.ProfitOperationPersent, 2),
-                    Math.Round(p.ProfitOperationPunkt, 4),
-                    Math.Round(p.ProfitPortfolioPersent, 2),
-                    Math.Round(p.ProfitPortfolioPunkt, 4),
-                    Math.Round(p.PortfolioValueOnOpenPosition, 2),
-                    Math.Round(p.PortfolioValueOnOpenPosition + p.ProfitPortfolioPunkt, 2)
-                    );
-            }
+            OlegUtils.Log("\n#{0} {1}\n\tvolume = {2}\n\topen price = {3}\n\tclose price = {4}\n\tfee = {5}% = {6}$" +
+                "\n\tprice change = {7}% = {8}$\n\tdepo profit = {9}% = {10}$\n\tDEPO: {11}$ ===> {12}$",
+                p.Number,
+                p.Direction,
+                p.OpenOrders.First().Volume,
+                p.EntryPrice,
+                p.ClosePrice,
+                p.ComissionValue,
+                Math.Round(p.CommissionTotal(), 2),
+                Math.Round(p.ProfitOperationPersent, 2),
+                Math.Round(p.ProfitOperationPunkt, 4),
+                Math.Round(p.ProfitPortfolioPersent, 2),
+                Math.Round(p.ProfitPortfolioPunkt, 4),
+                Math.Round(p.PortfolioValueOnOpenPosition, 2),
+                Math.Round(p.PortfolioValueOnOpenPosition + p.ProfitPortfolioPunkt, 2)
+                );
         }
 
         enum TradingState
