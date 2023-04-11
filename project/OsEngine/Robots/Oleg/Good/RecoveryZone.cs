@@ -12,13 +12,20 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("RecoveryZone")]
     public class RecoveryZone : BotPanel
     {
+        private static readonly string RECOVERY_MODE_BOTH_DIRECTIONS = "BOTH DIRECTIONS";
+        private static readonly string RECOVERY_MODE_LOSS_DIRECTION_ONLY = "LOSS DIRECTION ONLY";
+        private static readonly string RECOVERY_MODE_NONE = "NONE";
+
         private BotTabSimple _bot;
         private TradingState _state;
+        private PriceLocation _priceLocation;
         private decimal _zoneUp;
         private decimal _zoneDown;
         private decimal _balanceOnStart;
         private decimal _squeezeSize;
         private int _dealAttemptsCounter;
+
+        private event Action<PriceLocation, PriceLocation> RecoveryZoneCrossedEvent;
 
         private BollingerWithSqueeze _bollingerWithSqueeze;
 
@@ -31,7 +38,7 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
 
-        private StrategyParameterBool RecoveryEnabled;
+        private StrategyParameterString RecoveryMode;
         private StrategyParameterBool PositionResultsLoggingEnabled;
         private StrategyParameterDecimal RiskZoneInSqueezes;
         private StrategyParameterDecimal ProfitInSqueezes;
@@ -41,6 +48,7 @@ namespace OsEngine.Robots.Oleg.Good
             TabCreate(BotTabType.Simple);
             _bot = TabsSimple[0];
             _state = TradingState.FREE;
+            _priceLocation = PriceLocation.UNDEFINED;
             _dealAttemptsCounter = 0;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
@@ -50,11 +58,11 @@ namespace OsEngine.Robots.Oleg.Good
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
-
-            RecoveryEnabled = CreateParameter("Recovery enabled", true, "Base");
             PositionResultsLoggingEnabled = CreateParameter("Log position results", false, "Base");
             RiskZoneInSqueezes = CreateParameter("RiskZone in SQUEEZEs", 2.9m, 0.1m, 10, 0.1m, "Base");
             ProfitInSqueezes = CreateParameter("Profit in SQUEEZEs", 2.8m, 0.1m, 10, 0.1m, "Base");
+            RecoveryMode = CreateParameter("Recovery mode", RECOVERY_MODE_BOTH_DIRECTIONS, 
+                new[] { RECOVERY_MODE_BOTH_DIRECTIONS, RECOVERY_MODE_LOSS_DIRECTION_ONLY, RECOVERY_MODE_NONE }, "Base");
 
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
             _bollingerWithSqueeze = (BollingerWithSqueeze)_bot.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
@@ -63,11 +71,13 @@ namespace OsEngine.Robots.Oleg.Good
             _bollingerWithSqueeze.SqueezePeriod = BollingerSqueezeLength.ValueInt;
             _bollingerWithSqueeze.Save();
 
-            _bot.CandleFinishedEvent += event_CandleFinished_SQUEEZE_FOUND;
+            _bot.CandleFinishedEvent += event_CandleClosed_SQUEEZE_FOUND;
+            _bot.CandleUpdateEvent += event_CandleUpdated_CROSS_ZONE;
             _bot.PositionOpeningSuccesEvent += event_PositionOpened_SET_ORDERS;
             _bot.PositionClosingSuccesEvent += event_PositionClosed_FINISH_DEAL;
 
             this.ParametrsChangeByUser += event_ParametersChangedByUser;
+            this.RecoveryZoneCrossedEvent += event_RecoveryZoneCrossed_SET_ORDERS;
             event_ParametersChangedByUser();
         }
 
@@ -92,9 +102,9 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void event_CandleFinished_SQUEEZE_FOUND(List<Candle> candles)
+        private void event_CandleClosed_SQUEEZE_FOUND(List<Candle> candles)
         {
-            if (ReadyToTrade())
+            if (IsEnoughDataAndEnabledToTrade())
             {
                 bool freeState = _state == TradingState.FREE;
                 bool noPositions = _bot.PositionsOpenAll.Count == 0;
@@ -113,15 +123,86 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
+        private void event_CandleUpdated_CROSS_ZONE(List<Candle> candles)
+        {
+            bool hasCandles = candles != null && candles.Count > 0;
+            bool dealInProgress = _state == TradingState.LONG_ENTERED || _state == TradingState.SHORT_ENTERED;
+
+            if (hasCandles && dealInProgress)
+            {
+                decimal currentPrice = candles.Last().Close;
+                PriceLocation oldPriceLocation = _priceLocation;
+
+                if (currentPrice > _zoneUp && _priceLocation != PriceLocation.ABOVE_ZONE)
+                {
+                    _priceLocation = PriceLocation.ABOVE_ZONE;
+                }
+                else if (currentPrice < _zoneUp && currentPrice > _zoneDown && _priceLocation != PriceLocation.IN_ZONE)
+                {
+                    _priceLocation = PriceLocation.IN_ZONE;
+                }
+                else if (currentPrice < _zoneDown && _priceLocation != PriceLocation.UNDER_ZONE)
+                {
+                    _priceLocation = PriceLocation.UNDER_ZONE;
+                }
+
+                if (oldPriceLocation != _priceLocation)
+                {
+                    RecoveryZoneCrossedEvent(oldPriceLocation, _priceLocation);
+                }
+            }
+        }
+
+        private void event_RecoveryZoneCrossed_SET_ORDERS(PriceLocation oldPriceLocation, PriceLocation newPriceLocation)
+        {
+            bool needToSetOrdersOnRecoveryZoneCross = RecoveryMode.ValueString == RECOVERY_MODE_LOSS_DIRECTION_ONLY;
+            if (needToSetOrdersOnRecoveryZoneCross)
+            {
+                bool longDeal = _state == TradingState.LONG_ENTERED;
+                bool shortDeal = _state == TradingState.SHORT_ENTERED;
+                bool dealInProgress = longDeal || shortDeal;
+                bool crossedRecoveryZoneInside = newPriceLocation == PriceLocation.IN_ZONE;
+
+                if (dealInProgress && crossedRecoveryZoneInside)
+                {
+                    bool crossedRecoveryZoneFromTop = oldPriceLocation == PriceLocation.ABOVE_ZONE;
+                    bool crossedRecoveryZoneFromBottom = oldPriceLocation == PriceLocation.UNDER_ZONE;
+
+                    if (longDeal && crossedRecoveryZoneFromTop)
+                    {
+                        bool shortEntryOrderAlreadySet = _bot.PositionOpenerToStopsAll != null && 
+                            _bot.PositionOpenerToStopsAll.Any(order => order.Side == Side.Sell);
+                        if (!shortEntryOrderAlreadySet)
+                        {
+                            Set_EN_Order_SHORT();
+                        }
+                    }
+                    else if (shortDeal && crossedRecoveryZoneFromBottom)
+                    {
+                        bool longEntryOrderAlreadySet = _bot.PositionOpenerToStopsAll != null && 
+                            _bot.PositionOpenerToStopsAll.Any(order => order.Side == Side.Buy);
+                        if (!longEntryOrderAlreadySet)
+                        {
+                            Set_EN_Order_LONG();
+                        }
+                    }
+                }
+            }
+        }
+
         private void event_PositionOpened_SET_ORDERS(Position p)
         {
             if (p != null && p.State == PositionStateType.Open)
             {
                 _dealAttemptsCounter++;
 
+                bool recoveryNeeded = 
+                    RecoveryMode.ValueString == RECOVERY_MODE_BOTH_DIRECTIONS || 
+                    (RecoveryMode.ValueString == RECOVERY_MODE_LOSS_DIRECTION_ONLY && IsFirstAttempt());
+
                 if (p.Direction == Side.Buy)
                 {
-                    if (IsFirstEntry())
+                    if (IsFirstAttempt())
                     {
                         _bot.SellAtStopCancel();
                         _zoneDown = p.EntryPrice - _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
@@ -129,7 +210,7 @@ namespace OsEngine.Robots.Oleg.Good
 
                     Set_TP_Order_LONG(p);
                     Set_SL_Order_LONG(p);
-                    if (RecoveryEnabled.ValueBool)
+                    if (recoveryNeeded)
                     {
                         Set_EN_Order_SHORT();
                     }
@@ -139,7 +220,7 @@ namespace OsEngine.Robots.Oleg.Good
 
                 if (p.Direction == Side.Sell)
                 {
-                    if (IsFirstEntry())
+                    if (IsFirstAttempt())
                     {
                         _bot.BuyAtStopCancel();
                         _zoneUp = p.EntryPrice + _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
@@ -147,7 +228,7 @@ namespace OsEngine.Robots.Oleg.Good
 
                     Set_TP_Order_SHORT(p);
                     Set_SL_Order_SHORT(p);
-                    if (RecoveryEnabled.ValueBool)
+                    if (recoveryNeeded)
                     {
                         Set_EN_Order_LONG();
                     }
@@ -166,6 +247,7 @@ namespace OsEngine.Robots.Oleg.Good
                     _bot.BuyAtStopCancel();
                     _bot.SellAtStopCancel();
                     _state = TradingState.FREE;
+                    _priceLocation = PriceLocation.UNDEFINED;
                     _dealAttemptsCounter = 0;
                 }
 
@@ -190,13 +272,13 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_SL_Order_LONG(Position p)
         {
-            decimal SL_price = RecoveryEnabled.ValueBool ? Calc_TP_Price_SHORT(_zoneDown) : _zoneDown;
+            decimal SL_price = RecoveryMode.ValueString == RECOVERY_MODE_NONE ? _zoneDown : Calc_TP_Price_SHORT(_zoneDown);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_SL_Order_SHORT(Position p)
         {
-            decimal SL_price = RecoveryEnabled.ValueBool ? Calc_TP_Price_LONG(_zoneUp) : _zoneUp;
+            decimal SL_price = RecoveryMode.ValueString == RECOVERY_MODE_NONE ? _zoneUp : Calc_TP_Price_LONG(_zoneUp);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
@@ -230,12 +312,12 @@ namespace OsEngine.Robots.Oleg.Good
             return entryPrice - TP_size;
         }
 
-        private bool IsFirstEntry()
+        private bool IsFirstAttempt()
         {
             return _bot.PositionsOpenAll.Count == 1;
         }
 
-        private bool ReadyToTrade()
+        private bool IsEnoughDataAndEnabledToTrade()
         {
             int candlesCount = _bot.CandlesAll != null ? _bot.CandlesAll.Count : 0;
             bool robotEnabled = Regime.ValueString == "On";
@@ -321,9 +403,12 @@ namespace OsEngine.Robots.Oleg.Good
             SHORT_ENTERED
         }
 
-        // ******************** CANDLE UPDATE ***********************
-        // _bot.CandleUpdateEvent += event_CandleUpdated;
-        // private void event_CandleUpdated(List<Candle> candles) { }
-        // **********************************************************
+        enum PriceLocation
+        {
+            ABOVE_ZONE,
+            IN_ZONE,
+            UNDER_ZONE,
+            UNDEFINED
+        }
     }
 }
