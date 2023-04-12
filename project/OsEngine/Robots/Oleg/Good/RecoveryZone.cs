@@ -17,6 +17,7 @@ namespace OsEngine.Robots.Oleg.Good
         private static readonly string RECOVERY_MODE_NONE = "NONE";
 
         private BotTabSimple _bot;
+        private Side _dealDirection;
         private TradingState _state;
         private PriceLocation _priceLocation;
         private decimal _zoneUp;
@@ -48,6 +49,7 @@ namespace OsEngine.Robots.Oleg.Good
             TabCreate(BotTabType.Simple);
             _bot = TabsSimple[0];
             _state = TradingState.FREE;
+            _dealDirection = Side.None;
             _priceLocation = PriceLocation.UNDEFINED;
             _dealAttemptsCounter = 0;
 
@@ -158,8 +160,8 @@ namespace OsEngine.Robots.Oleg.Good
             bool needToSetOrdersOnRecoveryZoneCross = RecoveryMode.ValueString == RECOVERY_MODE_LOSS_DIRECTION_ONLY;
             if (needToSetOrdersOnRecoveryZoneCross)
             {
-                bool longDeal = _state == TradingState.LONG_ENTERED;
-                bool shortDeal = _state == TradingState.SHORT_ENTERED;
+                bool longDeal = _dealDirection == Side.Buy;
+                bool shortDeal = _dealDirection == Side.Sell;
                 bool dealInProgress = longDeal || shortDeal;
                 bool crossedRecoveryZoneInside = newPriceLocation == PriceLocation.IN_ZONE;
 
@@ -204,6 +206,7 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     if (IsFirstAttempt())
                     {
+                        _dealDirection = Side.Buy;
                         _bot.SellAtStopCancel();
                         _zoneDown = p.EntryPrice - _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
                     }                    
@@ -222,6 +225,7 @@ namespace OsEngine.Robots.Oleg.Good
                 {
                     if (IsFirstAttempt())
                     {
+                        _dealDirection = Side.Sell;
                         _bot.BuyAtStopCancel();
                         _zoneUp = p.EntryPrice + _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
                     }
@@ -247,6 +251,7 @@ namespace OsEngine.Robots.Oleg.Good
                     _bot.BuyAtStopCancel();
                     _bot.SellAtStopCancel();
                     _state = TradingState.FREE;
+                    _dealDirection = Side.None;
                     _priceLocation = PriceLocation.UNDEFINED;
                     _dealAttemptsCounter = 0;
                 }
