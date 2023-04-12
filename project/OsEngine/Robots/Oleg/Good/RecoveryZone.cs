@@ -74,7 +74,6 @@ namespace OsEngine.Robots.Oleg.Good
             _bollingerWithSqueeze.Save();
 
             _bot.CandleFinishedEvent += event_CandleClosed_SQUEEZE_FOUND;
-            _bot.CandleUpdateEvent += event_CandleUpdated_CROSS_ZONE;
             _bot.PositionOpeningSuccesEvent += event_PositionOpened_SET_ORDERS;
             _bot.PositionClosingSuccesEvent += event_PositionClosed_FINISH_DEAL;
 
@@ -101,6 +100,15 @@ namespace OsEngine.Robots.Oleg.Good
                 _bollingerWithSqueeze.SqueezePeriod = BollingerSqueezeLength.ValueInt;
                 _bollingerWithSqueeze.Reload();
                 _bollingerWithSqueeze.Save();
+            }
+
+            if (RecoveryMode.ValueString == RECOVERY_MODE_LOSS_DIRECTION_ONLY)
+            {
+                _bot.CandleUpdateEvent += event_CandleUpdated_CROSS_ZONE;
+            }
+            else
+            {
+                _bot.CandleUpdateEvent -= event_CandleUpdated_CROSS_ZONE;
             }
         }
 
@@ -148,7 +156,7 @@ namespace OsEngine.Robots.Oleg.Good
                     _priceLocation = PriceLocation.UNDER_ZONE;
                 }
 
-                if (oldPriceLocation != _priceLocation)
+                if (oldPriceLocation != _priceLocation && RecoveryZoneCrossedEvent != null)
                 {
                     RecoveryZoneCrossedEvent(oldPriceLocation, _priceLocation);
                 }
