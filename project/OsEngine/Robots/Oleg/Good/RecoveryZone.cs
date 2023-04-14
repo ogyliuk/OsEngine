@@ -300,7 +300,7 @@ namespace OsEngine.Robots.Oleg.Good
             decimal buyCoinsVolume = GetNewAttemptCoinsVolume(Side.Buy);
             if (buyCoinsVolume > 0)
             {
-                _bot.BuyAtStop(buyCoinsVolume, _zoneUp, _zoneUp, StopActivateType.HigherOrEqual, 100);
+                _bot.BuyAtStop(buyCoinsVolume, _zoneUp, _zoneUp, StopActivateType.HigherOrEqual, 100000);
             }
         }
 
@@ -309,7 +309,7 @@ namespace OsEngine.Robots.Oleg.Good
             decimal sellCoinsVolume = GetNewAttemptCoinsVolume(Side.Sell);
             if (sellCoinsVolume > 0)
             {
-                _bot.SellAtStop(sellCoinsVolume, _zoneDown, _zoneDown, StopActivateType.LowerOrEqyal, 100);
+                _bot.SellAtStop(sellCoinsVolume, _zoneDown, _zoneDown, StopActivateType.LowerOrEqyal, 100000);
             }
         }
 
