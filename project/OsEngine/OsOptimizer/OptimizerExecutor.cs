@@ -973,7 +973,7 @@ namespace OsEngine.OsOptimizer
 
                 for (int i = 0; i < _servers.Count; i++)
                 {
-                    if (_servers[i].NumberServer == serverNum)
+                    if (_servers[i] != null && _servers[i].NumberServer == serverNum)
                     {
                         _servers[i].TestingEndEvent -= server_TestingEndEvent;
                         _servers[i].TestintProgressChangeEvent -= server_TestintProgressChangeEvent;
