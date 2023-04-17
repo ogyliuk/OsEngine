@@ -262,6 +262,12 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
+        /// GUID of the deal
+        /// GUID сделки
+        /// </summary>
+        public string DealGuid;
+
+        /// <summary>
         /// position number
         /// номер позиции
         /// </summary>

@@ -25,6 +25,7 @@ namespace OsEngine.Robots.Oleg.Good
         private decimal _balanceOnStart;
         private decimal _squeezeSize;
         private int _dealAttemptsCounter;
+        private string _dealGuid;
 
         private event Action<PriceLocation, PriceLocation> RecoveryZoneCrossedEvent;
 
@@ -52,6 +53,7 @@ namespace OsEngine.Robots.Oleg.Good
             _dealDirection = Side.None;
             _priceLocation = PriceLocation.UNDEFINED;
             _dealAttemptsCounter = 0;
+            _dealGuid = String.Empty;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
@@ -204,7 +206,13 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (p != null && p.State == PositionStateType.Open)
             {
+                if (_dealAttemptsCounter == 0)
+                {
+                    _dealGuid = Guid.NewGuid().ToString();
+                }
+
                 _dealAttemptsCounter++;
+                p.DealGuid = _dealGuid;
 
                 bool recoveryNeeded = 
                     RecoveryMode.ValueString == RECOVERY_MODE_BOTH_DIRECTIONS || 
@@ -261,6 +269,7 @@ namespace OsEngine.Robots.Oleg.Good
                     _state = TradingState.FREE;
                     _dealDirection = Side.None;
                     _priceLocation = PriceLocation.UNDEFINED;
+                    _dealGuid = String.Empty;
                     _dealAttemptsCounter = 0;
                 }
 

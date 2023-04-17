@@ -4,6 +4,7 @@
 */
 
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Globalization;
 using OsEngine.Entity;
@@ -21,7 +22,7 @@ namespace OsEngine.Journal.Internal
         /// </summary>
         /// <param name="positions"></param>
         /// <param name="withPunkt">If data from several tabs or several robots, then you need to write false/если данные из нескольких вкладок или нескольких роботов, то нужно писать false</param>
-        public static List<string> GetStatisticNew(List<Position> positions)
+        public static List<string> GetStatisticNew(List<Position> positions, bool printDealsWithPoses = false)
         {
             if (positions == null)
             {
@@ -133,9 +134,64 @@ namespace OsEngine.Journal.Internal
             report.Add(Math.Round(GetMaxDownPersent(deals), 6).ToString(new CultureInfo("ru-RU"))); //maximum drawdown in percent/максимальная просадка в процентах
             report.Add(Math.Round(GetCommissionAmount(deals), 6).ToString(new CultureInfo("ru-RU"))); //maximum drawdown in percent/максимальная просадка в процентах
 
+            report.Add("");
+            report.Add(printDealsWithPoses ? CalculatePosesInDealsCountInfo(deals) : String.Empty);
+
             /*report += Math.Round(GetSharp(), 2).ToString(new CultureInfo("ru-RU"));
             */
             return report;
+        }
+
+        private static string CalculatePosesInDealsCountInfo(Position[] positions)
+        {
+            string result = "n/a";
+            Dictionary<string, int> dealsWithPosesCounters = new Dictionary<string, int>();
+            if (positions != null && positions.Length > 0)
+            {
+                foreach (Position p in positions)
+                {
+                    if (p != null && !String.IsNullOrWhiteSpace(p.DealGuid))
+                    {
+                        if (dealsWithPosesCounters.ContainsKey(p.DealGuid))
+                        {
+                            dealsWithPosesCounters[p.DealGuid]++;
+                        }
+                        else
+                        {
+                            dealsWithPosesCounters.Add(p.DealGuid, 1);
+                        }
+                    }
+                }
+
+                if (dealsWithPosesCounters.Count > 0)
+                {
+                    SortedDictionary<int, int> posesNumberToDealsNumberDictionary = new SortedDictionary<int, int>();
+                    foreach (int posesNumber in dealsWithPosesCounters.Values)
+                    {
+                        if (posesNumberToDealsNumberDictionary.ContainsKey(posesNumber))
+                        {
+                            posesNumberToDealsNumberDictionary[posesNumber]++;
+                        }
+                        else
+                        {
+                            posesNumberToDealsNumberDictionary.Add(posesNumber, 1);
+                        }
+                    }
+
+                    if (posesNumberToDealsNumberDictionary.Count > 0)
+                    {
+                        result = String.Format("DEALS = {0} [ ", posesNumberToDealsNumberDictionary.Values.Sum());
+                        for (int i = posesNumberToDealsNumberDictionary.Count - 1; i >= 0; i--)
+                        {
+                            int posesNumber = posesNumberToDealsNumberDictionary.Keys.ElementAt(i);
+                            result += String.Format("{0}p = {1}d; ", posesNumber, posesNumberToDealsNumberDictionary[posesNumber]);
+                        }
+                        result += "]";
+                    }   
+                }
+            }
+
+            return result;
         }
 
         /// <summary>

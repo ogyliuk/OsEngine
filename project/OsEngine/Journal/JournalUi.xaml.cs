@@ -36,6 +36,8 @@ namespace OsEngine.Journal
     /// </summary>
     public partial class JournalUi
     {
+        private static readonly int STATS_REPORT_ROW_NUMBER = 31;
+
         /// <summary>
         /// if window recycled
         /// является ли окно утилизированным
@@ -663,7 +665,7 @@ namespace OsEngine.Journal
                 column3.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
                 _gridStatistics.Columns.Add(column3);
 
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < STATS_REPORT_ROW_NUMBER; i++)
                 {
                     _gridStatistics.Rows.Add(); //string addition/ добавление строки
                 }
@@ -698,6 +700,8 @@ namespace OsEngine.Journal
                 _gridStatistics.Rows[26].Cells[0].Value = "";
                 _gridStatistics.Rows[27].Cells[0].Value = OsLocalization.Journal.GridRow15;
                 _gridStatistics.Rows[28].Cells[0].Value = OsLocalization.Journal.GridRow16;
+                _gridStatistics.Rows[29].Cells[0].Value = "";
+                _gridStatistics.Rows[30].Cells[0].Value = OsLocalization.Journal.GridRow17;
             }
             catch (Exception error)
             {
@@ -716,48 +720,48 @@ namespace OsEngine.Journal
                 CreateTableToStatistic();
             }
 
-            List<string> positionsAllState = PositionStaticticGenerator.GetStatisticNew(positionsAll);
+            List<string> positionsAllState = PositionStaticticGenerator.GetStatisticNew(positionsAll, printDealsWithPoses: true);
             List<string> positionsLongState = PositionStaticticGenerator.GetStatisticNew(positionsLong);
             List<string> positionsShortState = PositionStaticticGenerator.GetStatisticNew(positionsShort);
 
             if (positionsAllState == null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < _gridStatistics.RowCount; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = "";
                 }
             }
             if (positionsLongState == null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < _gridStatistics.RowCount; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = "";
                 }
             }
             if (positionsShortState == null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < _gridStatistics.RowCount; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = "";
                 }
             }
             if (positionsLongState != null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < _gridStatistics.RowCount; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = positionsLongState[i].ToString();
                 }
             }
             if (positionsShortState != null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < _gridStatistics.RowCount; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = positionsShortState[i].ToString();
                 }
             }
             if (positionsAllState != null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < _gridStatistics.RowCount; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = positionsAllState[i].ToString();
                 }
