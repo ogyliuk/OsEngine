@@ -184,7 +184,7 @@ namespace OsEngine.Journal.Internal
                         for (int i = posesNumberToDealsNumberDictionary.Count - 1; i >= 0; i--)
                         {
                             int posesNumber = posesNumberToDealsNumberDictionary.Keys.ElementAt(i);
-                            result += String.Format("{0}p = {1}d; ", posesNumber, posesNumberToDealsNumberDictionary[posesNumber]);
+                            result += String.Format("{0}pos = {1}deals; ", posesNumber, posesNumberToDealsNumberDictionary[posesNumber]);
                         }
                         result += "]";
                     }   
