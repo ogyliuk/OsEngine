@@ -180,11 +180,11 @@ namespace OsEngine.Journal.Internal
 
                     if (posesNumberToDealsNumberDictionary.Count > 0)
                     {
-                        result = String.Format("DEALS = {0} [ ", posesNumberToDealsNumberDictionary.Values.Sum());
-                        for (int i = posesNumberToDealsNumberDictionary.Count - 1; i >= 0; i--)
+                        result = String.Format("DEALS={0}[", posesNumberToDealsNumberDictionary.Values.Sum());
+                        for (int i = 0; i < posesNumberToDealsNumberDictionary.Count; i++)
                         {
                             int posesNumber = posesNumberToDealsNumberDictionary.Keys.ElementAt(i);
-                            result += String.Format("{0}pos = {1}deals; ", posesNumber, posesNumberToDealsNumberDictionary[posesNumber]);
+                            result += String.Format("{0}at={1}D;", posesNumber, posesNumberToDealsNumberDictionary[posesNumber]);
                         }
                         result += "]";
                     }   

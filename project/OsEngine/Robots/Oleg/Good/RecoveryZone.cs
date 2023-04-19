@@ -13,6 +13,7 @@ namespace OsEngine.Robots.Oleg.Good
     public class RecoveryZone : BotPanel
     {
         private static readonly string RECOVERY_MODE_BOTH_DIRECTIONS = "BOTH DIRECTIONS";
+        private static readonly string RECOVERY_MODE_NETT_BOTH_DIRECTIONS = "NETT BOTH DIRECTIONS";
         private static readonly string RECOVERY_MODE_LOSS_DIRECTION_ONLY = "LOSS DIRECTION ONLY";
         private static readonly string RECOVERY_MODE_NONE = "NONE";
 
@@ -65,8 +66,17 @@ namespace OsEngine.Robots.Oleg.Good
             PositionResultsLoggingEnabled = CreateParameter("Log position results", false, "Base");
             RiskZoneInSqueezes = CreateParameter("RiskZone in SQUEEZEs", 2.9m, 0.1m, 10, 0.1m, "Base");
             ProfitInSqueezes = CreateParameter("Profit in SQUEEZEs", 2.8m, 0.1m, 10, 0.1m, "Base");
-            RecoveryMode = CreateParameter("Recovery mode", RECOVERY_MODE_BOTH_DIRECTIONS, 
-                new[] { RECOVERY_MODE_BOTH_DIRECTIONS, RECOVERY_MODE_LOSS_DIRECTION_ONLY, RECOVERY_MODE_NONE }, "Base");
+            RecoveryMode = CreateParameter(
+                name: "Recovery mode", 
+                value: RECOVERY_MODE_BOTH_DIRECTIONS, 
+                collection: new[]
+                { 
+                    RECOVERY_MODE_BOTH_DIRECTIONS, 
+                    RECOVERY_MODE_NETT_BOTH_DIRECTIONS, 
+                    RECOVERY_MODE_LOSS_DIRECTION_ONLY, 
+                    RECOVERY_MODE_NONE 
+                }, 
+                tabControlName: "Base");
 
             _bollingerWithSqueeze = new BollingerWithSqueeze(name + "BollingerWithSqueeze", false);
             _bollingerWithSqueeze = (BollingerWithSqueeze)_bot.CreateCandleIndicator(_bollingerWithSqueeze, "Prime");
@@ -215,7 +225,8 @@ namespace OsEngine.Robots.Oleg.Good
                 p.DealGuid = _dealGuid;
 
                 bool recoveryNeeded = 
-                    RecoveryMode.ValueString == RECOVERY_MODE_BOTH_DIRECTIONS || 
+                    RecoveryMode.ValueString == RECOVERY_MODE_BOTH_DIRECTIONS ||
+                    RecoveryMode.ValueString == RECOVERY_MODE_NETT_BOTH_DIRECTIONS ||
                     (RecoveryMode.ValueString == RECOVERY_MODE_LOSS_DIRECTION_ONLY && IsFirstAttempt());
 
                 if (p.Direction == Side.Buy)
@@ -294,13 +305,19 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_SL_Order_LONG(Position p)
         {
-            decimal SL_price = RecoveryMode.ValueString == RECOVERY_MODE_NONE ? _zoneDown : Calc_TP_Price_SHORT(_zoneDown);
+            bool stopOnRecoveryZoneBorder = 
+                RecoveryMode.ValueString == RECOVERY_MODE_NONE || 
+                RecoveryMode.ValueString == RECOVERY_MODE_NETT_BOTH_DIRECTIONS;
+            decimal SL_price = stopOnRecoveryZoneBorder ? _zoneDown : Calc_TP_Price_SHORT(_zoneDown);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_SL_Order_SHORT(Position p)
         {
-            decimal SL_price = RecoveryMode.ValueString == RECOVERY_MODE_NONE ? _zoneUp : Calc_TP_Price_LONG(_zoneUp);
+            bool stopOnRecoveryZoneBorder =
+                RecoveryMode.ValueString == RECOVERY_MODE_NONE ||
+                RecoveryMode.ValueString == RECOVERY_MODE_NETT_BOTH_DIRECTIONS;
+            decimal SL_price = stopOnRecoveryZoneBorder ? _zoneUp : Calc_TP_Price_LONG(_zoneUp);
             _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
