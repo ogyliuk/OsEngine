@@ -58,14 +58,14 @@ namespace OsEngine.Robots.Oleg.Good
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
-            VolumeMultiplier = CreateParameter("Volume multiplier", 0.5m, 0.25m, 0.5m, 0.05m, "Base");
+            VolumeMultiplier = CreateParameter("Volume multiplier", 0.5m, 0.5m, 0.6m, 0.05m, "Base");
             MinVolumeUSDT = CreateParameter("Min Volume USDT", 7m, 7m, 7m, 1m, "Base");
-            BollingerLength = CreateParameter("Length BOLLINGER", 20, 10, 50, 2, "Robot parameters");
-            BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 1m, 3m, 0.1m, "Robot parameters");
-            BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 100, 600, 5, "Robot parameters");
+            BollingerLength = CreateParameter("Length BOLLINGER", 20, 20, 50, 2, "Robot parameters");
+            BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 2m, 3m, 0.1m, "Robot parameters");
+            BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 130, 600, 5, "Robot parameters");
             PositionResultsLoggingEnabled = CreateParameter("Log position results", false, "Base");
-            RiskZoneInSqueezes = CreateParameter("RiskZone in SQUEEZEs", 2.9m, 0.1m, 10, 0.1m, "Base");
-            ProfitInSqueezes = CreateParameter("Profit in SQUEEZEs", 2.8m, 0.1m, 10, 0.1m, "Base");
+            RiskZoneInSqueezes = CreateParameter("RiskZone in SQUEEZEs", 2.9m, 1m, 10, 0.1m, "Base");
+            ProfitInSqueezes = CreateParameter("Profit in SQUEEZEs", 2.8m, 1m, 10, 0.1m, "Base");
             RecoveryMode = CreateParameter(
                 name: "Recovery mode", 
                 value: RECOVERY_MODE_BOTH_DIRECTIONS, 
