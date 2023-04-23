@@ -273,7 +273,12 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (p != null && p.State == PositionStateType.Done)
             {
-                if (_bot.PositionsOpenAll.Count == 0)
+                bool closingPositionByTakeProfit = 
+                    (p.Direction == Side.Sell && p.EntryPrice > p.ClosePrice) || 
+                    (p.Direction == Side.Buy && p.EntryPrice < p.ClosePrice);
+                bool closingLastPosition = _bot.PositionsOpenAll.Count == 0;
+                bool noMoreEntryOrdersSet = _bot.PositionOpenerToStopsAll.Count == 0;
+                if (closingLastPosition && (noMoreEntryOrdersSet || closingPositionByTakeProfit))
                 {
                     _bot.BuyAtStopCancel();
                     _bot.SellAtStopCancel();
