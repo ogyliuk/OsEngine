@@ -353,7 +353,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         private bool IsFirstAttempt()
         {
-            return _bot.PositionsOpenAll.Count == 1;
+            return _dealAttemptsCounter == 1;
         }
 
         private bool IsEnoughDataAndEnabledToTrade()
