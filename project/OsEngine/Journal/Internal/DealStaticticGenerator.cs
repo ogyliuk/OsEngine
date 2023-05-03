@@ -826,6 +826,17 @@ namespace OsEngine.Journal.Internal
         /// </summary>
         public static decimal GetProfitFactor(Position[] deals)
         {
+            decimal profit = GetAllProfitInPunkt(deals);
+            decimal drawDown = Math.Abs(GetMaxDownPersent(deals));
+            return drawDown > 0 ? Decimal.Round(profit / drawDown, 2) : profit;
+        }
+
+        /// <summary>
+        /// take Profit factor - OLD version
+        /// взять Profit Factor - старая версия
+        /// </summary>
+        public static decimal GetProfitFactor_Old(Position[] deals)
+        {
             decimal commonProfitPunkt = 0m;
             decimal commonLossPunkt = 0m;
             decimal profitFactor = 0m;
