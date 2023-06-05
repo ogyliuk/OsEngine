@@ -40,6 +40,7 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterDecimal VolumeMultiplier;
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
+        private StrategyParameterDecimal MinWantedProfitPercent;
 
         private StrategyParameterString RecoveryMode;
         private StrategyParameterBool PositionResultsLoggingEnabled;
@@ -60,6 +61,7 @@ namespace OsEngine.Robots.Oleg.Good
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
             VolumeMultiplier = CreateParameter("Volume multiplier", 0.5m, 0.5m, 0.6m, 0.05m, "Base");
             MinVolumeUSDT = CreateParameter("Min Volume USDT", 7m, 7m, 7m, 1m, "Base");
+            MinWantedProfitPercent = CreateParameter("Min wanted profit %", 0.1m, 0.1m, 0.1m, 0.1m, "Base");
             BollingerLength = CreateParameter("Length BOLLINGER", 20, 20, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("Bollinger deviation", 2m, 2m, 3m, 0.1m, "Robot parameters");
             BollingerSqueezeLength = CreateParameter("Length BOLLINGER SQUEEZE", 130, 130, 600, 5, "Robot parameters");
@@ -133,14 +135,19 @@ namespace OsEngine.Robots.Oleg.Good
                 bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
                 if (freeState && noPositions && lastCandleHasSqueeze)
                 {
-                    _state = TradingState.SQUEEZE_FOUND;
-                    _balanceOnStart = _bot.Portfolio.ValueCurrent;
-                    _squeezeSize = _bollingerWithSqueeze.ValuesUp.Last() - _bollingerWithSqueeze.ValuesDown.Last();
-
-                    _zoneUp = _bollingerWithSqueeze.ValuesUp.Last();
-                    _zoneDown = _bollingerWithSqueeze.ValuesDown.Last();
-                    Set_EN_Order_LONG();
-                    Set_EN_Order_SHORT();
+                    decimal squeezeUpBand = _bollingerWithSqueeze.ValuesUp.Last();
+                    decimal squeezeDownBand = _bollingerWithSqueeze.ValuesDown.Last();
+                    decimal squeezeSize = squeezeUpBand - squeezeDownBand;
+                    if (IsSignalProfitable(squeezeUpBand, squeezeSize))
+                    {
+                        _state = TradingState.SQUEEZE_FOUND;
+                        _balanceOnStart = _bot.Portfolio.ValueCurrent;
+                        _zoneUp = squeezeUpBand;
+                        _zoneDown = squeezeDownBand;
+                        _squeezeSize = squeezeSize;
+                        Set_EN_Order_LONG();
+                        Set_EN_Order_SHORT();
+                    }
                 }
             }
         }
@@ -294,6 +301,21 @@ namespace OsEngine.Robots.Oleg.Good
                     LogPositionResults(p);
                 }
             }
+        }
+
+        private bool IsSignalProfitable(decimal longEntryPrice, decimal squeezeSize)
+        {
+            const decimal COINS_TO_TRADE = 1m;
+
+            decimal longTakeProfitPrice = longEntryPrice + squeezeSize * ProfitInSqueezes.ValueDecimal;
+            decimal moneyIn = COINS_TO_TRADE * longEntryPrice;
+            decimal feeIn = moneyIn * _bot.ComissionValue / 100;
+            decimal moneyOut = COINS_TO_TRADE * longTakeProfitPrice;
+            decimal feeOut = moneyOut * _bot.ComissionValue / 100;
+            decimal profitMoney = (moneyOut - moneyIn) - (feeIn + feeOut);
+            decimal profitPercent = profitMoney * 100 / moneyIn;
+
+            return profitPercent >= MinWantedProfitPercent.ValueDecimal;
         }
 
         private void Set_TP_Order_LONG(Position p)
