@@ -311,6 +311,7 @@ namespace OsEngine.OsOptimizer
             int num = 0;
 
             OptimizerReport inSampleReport = null;
+            _gridDep.AccessibleDescription = String.Empty;
 
             for (int i = 0; i < _reports.Count; i++)
             {
@@ -363,6 +364,7 @@ namespace OsEngine.OsOptimizer
                 if (curReport.Faze.TypeFaze == OptimizerFazeType.InSample)
                 {
                     cell4.Value = inSampleReport.BotName.Replace(" InSample", "").Replace("OpT", "");
+                    _gridDep.AccessibleDescription += inSampleReport.MaxDrowDawn + "|";
                 }
                 row.Cells.Add(cell4);
 

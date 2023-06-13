@@ -108,8 +108,9 @@ namespace OsEngine.Entity
             List<MenuItem> items = new List<MenuItem>();
 
             items.Add(new MenuItem("Save table in file"));
+            items.Add(new MenuItem("Do my calculations"));
 
-            items[items.Count - 1].Click += delegate (Object sender, EventArgs e)
+            items[0].Click += delegate (Object sender, EventArgs e)
             {
                 if (grid.Rows.Count == 0)
                 {
@@ -158,6 +159,10 @@ namespace OsEngine.Entity
                     MessageBox.Show(error.ToString());
                 }
             };
+            items[1].Click += delegate (Object sender, EventArgs e)
+            {
+                DoMyCalculations(grid);
+            };
 
             ContextMenu menu = new ContextMenu(items.ToArray());
 
@@ -169,6 +174,130 @@ namespace OsEngine.Entity
 
             grid.ContextMenu = menu;
             grid.ContextMenu.Show(grid, new Point(mouse.X, mouse.Y));
+        }
+
+        private static void DoMyCalculations(DataGridView grid)
+        {
+            const decimal DEPOSIT = 1000.00m;
+            const decimal MAX_ALLOWED_LEVERAGE = 3m;
+            const decimal MAX_ALLOWED_DROWDAWN = 15m;
+            const string START = "Start";
+            const string END = "End";
+            const string PROFIT = "Profit";
+            const string PERIOD = "Period";
+            const string OUT_OF_SAMPLE_PERIOD = "OutOfSample";
+
+            if (grid.Rows.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                decimal tradedDays = 0;
+                int startDateColumnIndex = -1;
+                int endDateColumnIndex = -1;
+                int periodColumnIndex = -1;
+                int profitColumnIndex = -1;
+                for (int i = 0; i < grid.Columns.Count; i++)
+                {
+                    if (grid.Columns[i].HeaderText == PERIOD)
+                    {
+                        periodColumnIndex = i;
+                    }
+                    if (grid.Columns[i].HeaderText == PROFIT)
+                    {
+                        profitColumnIndex = i;
+                    }
+                    if (grid.Columns[i].HeaderText == START)
+                    {
+                        startDateColumnIndex = i;
+                    }
+                    if (grid.Columns[i].HeaderText == END)
+                    {
+                        endDateColumnIndex = i;
+                    }
+                    if (periodColumnIndex >= 0 && profitColumnIndex >= 0 && startDateColumnIndex >= 0 && endDateColumnIndex >= 0)
+                    {
+                        break;
+                    }
+                }
+
+                if (periodColumnIndex >= 0 && profitColumnIndex >= 0 && startDateColumnIndex >= 0 && endDateColumnIndex >= 0 && !String.IsNullOrWhiteSpace(grid.AccessibleDescription))
+                {
+                    List<decimal> leverages = new List<decimal>();
+                    List<decimal> drowDawnsList = new List<decimal>();
+                    List<decimal> outOfSampleProfitPercents = new List<decimal>();
+                    foreach (string drowDawnStringValue in grid.AccessibleDescription.Split('|'))
+                    {
+                        if (!String.IsNullOrWhiteSpace(drowDawnStringValue))
+                        {
+                            drowDawnsList.Add(Decimal.Parse(drowDawnStringValue));
+                        }
+                    }
+
+                    if (drowDawnsList.Count > 0)
+                    {
+                        for (int i = 0; i < grid.Rows.Count; i++)
+                        {
+                            string periodStringValue = grid.Rows[i].Cells[periodColumnIndex].FormattedValue.ToString();
+                            if (periodStringValue == OUT_OF_SAMPLE_PERIOD)
+                            {
+                                DateTime startDate = DateTime.Parse(grid.Rows[i].Cells[startDateColumnIndex].FormattedValue.ToString());
+                                DateTime endDate = DateTime.Parse(grid.Rows[i].Cells[endDateColumnIndex].FormattedValue.ToString());
+                                int outOfSampleSizeInDays = (int)(endDate - startDate).TotalDays;
+                                tradedDays += outOfSampleSizeInDays;
+                                string profitStringValue = grid.Rows[i].Cells[profitColumnIndex].FormattedValue.ToString();
+                                profitStringValue = profitStringValue.Replace(".", System.Threading.Thread.CurrentThread.CurrentCulture.NumberFormat.NumberDecimalSeparator);
+                                decimal profitMoney = Decimal.Parse(profitStringValue);
+                                decimal profitPercentNoLeverage = profitMoney * 100 / DEPOSIT;
+                                decimal drowDawn = drowDawnsList[outOfSampleProfitPercents.Count];
+                                decimal leverage = drowDawn != 0 ? MAX_ALLOWED_DROWDAWN / Math.Abs(drowDawn) : MAX_ALLOWED_LEVERAGE;
+                                leverage = leverage > MAX_ALLOWED_LEVERAGE ? MAX_ALLOWED_LEVERAGE : leverage;
+                                leverages.Add(leverage);
+                                outOfSampleProfitPercents.Add(profitPercentNoLeverage * leverage);
+                            }
+                        }
+                    }
+
+                    if (outOfSampleProfitPercents.Count > 0 && outOfSampleProfitPercents.Count == drowDawnsList.Count)
+                    {
+                        string resultReport = String.Format("Deposit = {0}$\n", DEPOSIT);
+                        resultReport += String.Format("Max allowed DD = -{0}%\n", MAX_ALLOWED_DROWDAWN);
+                        resultReport += String.Format("Max allowed LEVERAGE = {0}\n\n", MAX_ALLOWED_LEVERAGE);
+
+                        decimal resultDeposit = DEPOSIT;
+                        for (int i = 0; i < outOfSampleProfitPercents.Count; i++)
+                        {
+                            decimal profitPercent = outOfSampleProfitPercents[i];
+                            decimal profit = resultDeposit * profitPercent / 100;
+                            string message = String.Format("{0} => {1}${2}{3}$[{4}%]", i < 9 ? "0" + (i + 1).ToString() : (i + 1).ToString(), Math.Round(resultDeposit, 2), profit > 0 ? " + " : " ", Math.Round(profit, 2), Math.Round(profitPercent, 2));
+                            message = message.Replace(" -", " - ");
+                            resultDeposit += profit;
+                            message += String.Format(" = {0}$", Math.Round(resultDeposit, 2));
+                            message += String.Format("\t | \tInSampleDD = {0}%", Math.Round(drowDawnsList[i], 2));
+                            message += String.Format("\t | \tLeverage = {0}", Math.Round(leverages[i], 2));
+                            resultReport += message + Environment.NewLine;
+                        }
+
+                        decimal totalProfitPercent = Math.Round(resultDeposit * 100 / DEPOSIT - 100, 2);
+                        decimal totalProfitMoney = Math.Round(resultDeposit - DEPOSIT, 2);
+                        decimal thirtyDaysProfitPercent = totalProfitPercent / tradedDays * 30m;
+                        decimal thirtyDaysProfitMoney = totalProfitMoney / tradedDays * 30m;
+                        resultReport += totalProfitMoney > 0 ? "\n*** PROFIT! ***" : "\n*** LOSS! ***";
+                        resultReport += String.Format("\n30 days = {0}{1}% [ {2}{3}$ ]", thirtyDaysProfitPercent > 0 ? "+" : "", Math.Round(thirtyDaysProfitPercent, 2), thirtyDaysProfitMoney > 0 ? "+" : "", Math.Round(thirtyDaysProfitMoney, 2));
+                        resultReport += String.Format("\nTOTAL = {0}{1}% [ {2}{3}$ ] : {4} months = {5} days", totalProfitPercent > 0 ? "+" : "", totalProfitPercent, totalProfitMoney > 0 ? "+" : "", totalProfitMoney, Math.Round(tradedDays / 30m, 1), tradedDays);
+                        resultReport += String.Format("\nAVG_InSampleDD = {0}%", Math.Round(drowDawnsList.Sum() / drowDawnsList.Count, 2));
+                        resultReport += String.Format("\nAVG_Leverage = {0}", Math.Round(leverages.Sum() / leverages.Count, 2));
+
+                        MessageBox.Show(resultReport);
+                    }
+                }
+            }
+            catch (Exception error)
+            {
+                MessageBox.Show(error.ToString());
+            }
         }
 
         public static void ClearLink(DataGridView grid)
