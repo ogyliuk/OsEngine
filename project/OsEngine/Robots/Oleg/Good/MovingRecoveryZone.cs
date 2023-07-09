@@ -243,7 +243,7 @@ namespace OsEngine.Robots.Oleg.Good
         private decimal Calc_BE_Price_MAIN_SHORT(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short)
         {
             decimal fee = _bot.ComissionValue;
-            return 0m; // TODO : find the formula
+            return (volLong * EP_Long * (100 + fee) - volShort * EP_Short * (100 - fee)) / (volLong * (100 - fee) - volShort * (100 + fee));
         }
 
         private decimal GetNewAttemptCoinsVolume(Side side)
