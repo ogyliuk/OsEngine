@@ -140,8 +140,8 @@ namespace OsEngine.Robots.Oleg.Good
                     else
                     {
                         decimal breakEvenPrice = Calc_BE_Price_MAIN_SHORT(_recoveryPosition.OpenVolume, _mainPosition.OpenVolume, _recoveryPosition.EntryPrice, _mainPosition.EntryPrice);
-                        // 1. Move main TP to new break even
-                        // 2. Set_SL_Order_LONG(p); - to new break even
+                        _bot.CloseAtProfit(_mainPosition, breakEvenPrice, breakEvenPrice);
+                        _bot.CloseAtStop(_recoveryPosition, breakEvenPrice, breakEvenPrice);
                     }
                 }
 
@@ -156,8 +156,8 @@ namespace OsEngine.Robots.Oleg.Good
                     else
                     {
                         decimal breakEvenPrice = Calc_BE_Price_MAIN_LONG(_mainPosition.OpenVolume, _recoveryPosition.OpenVolume, _mainPosition.EntryPrice, _recoveryPosition.EntryPrice);
-                        // 1. Move main TP to new break even
-                        // 2. Set_SL_Order_SHORT(p); - to new break even
+                        _bot.CloseAtProfit(_mainPosition, breakEvenPrice, breakEvenPrice);
+                        _bot.CloseAtStop(_recoveryPosition, breakEvenPrice, breakEvenPrice);
                     }
                 }
             }

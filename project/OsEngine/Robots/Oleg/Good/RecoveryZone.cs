@@ -321,13 +321,13 @@ namespace OsEngine.Robots.Oleg.Good
         private void Set_TP_Order_LONG(Position p)
         {
             decimal TP_price = Calc_TP_Price_LONG(p.EntryPrice);
-            _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
+            _bot.CloseAtProfit(p, TP_price, TP_price);
         }
 
         private void Set_TP_Order_SHORT(Position p)
         {
             decimal TP_price = Calc_TP_Price_SHORT(p.EntryPrice);
-            _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
+            _bot.CloseAtProfit(p, TP_price, TP_price);
         }
 
         private void Set_SL_Order_LONG(Position p)
