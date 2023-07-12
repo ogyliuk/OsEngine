@@ -92,6 +92,9 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void event_CandleClosed_SQUEEZE_FOUND(List<Candle> candles)
         {
+            // 1. No deal yet (set initial EP for both directions)
+            // 2. Recovery in progress (probably close recovery position + set new recovery EP + shift main TP)
+
             if (IsEnoughDataAndEnabledToTrade())
             {
                 bool freeState = _state == TradingState.FREE;
@@ -116,55 +119,25 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (p != null && p.State == PositionStateType.Open)
             {
-                bool mainPositionOpened = _mainPosition == null;
+                bool mainPositionOpened = RecognizeAndSetupPosition(p);
                 if (mainPositionOpened)
                 {
-                    _dealGuid = Guid.NewGuid().ToString();
-                    _mainPosition = p;
+                    CancelOpposite_EP_Order();
+                    SetMainPositionInitial_TP_Order();
+                    SetFirstRecovery_EP_Order();
                 }
                 else
                 {
-                    _recoveryPosition = p;
-                }
-
-                p.DealGuid = _dealGuid;
-
-                if (p.Direction == Side.Buy)
-                {
-                    if (mainPositionOpened)
-                    {
-                        _bot.SellAtStopCancel();
-                        Set_TP_Order_LONG(p);
-                        Set_EN_Order_SHORT(Calc_EP_FirstRecoveryPrice_LONG(p.EntryPrice));
-                    }
-                    else
-                    {
-                        decimal breakEvenPrice = Calc_BE_Price_MAIN_SHORT(_recoveryPosition.OpenVolume, _mainPosition.OpenVolume, _recoveryPosition.EntryPrice, _mainPosition.EntryPrice);
-                        _bot.CloseAtProfit(_mainPosition, breakEvenPrice, breakEvenPrice);
-                        _bot.CloseAtStop(_recoveryPosition, breakEvenPrice, breakEvenPrice);
-                    }
-                }
-
-                if (p.Direction == Side.Sell)
-                {
-                    if (mainPositionOpened)
-                    {
-                        _bot.BuyAtStopCancel();
-                        Set_TP_Order_SHORT(p);
-                        Set_EN_Order_LONG(Calc_EP_FirstRecoveryPrice_SHORT(p.EntryPrice));
-                    }
-                    else
-                    {
-                        decimal breakEvenPrice = Calc_BE_Price_MAIN_LONG(_mainPosition.OpenVolume, _recoveryPosition.OpenVolume, _mainPosition.EntryPrice, _recoveryPosition.EntryPrice);
-                        _bot.CloseAtProfit(_mainPosition, breakEvenPrice, breakEvenPrice);
-                        _bot.CloseAtStop(_recoveryPosition, breakEvenPrice, breakEvenPrice);
-                    }
+                    SetBothPositionsTo_BE_PriceExit();
                 }
             }
         }
 
         private void event_PositionClosed_CONTINUE_OR_FINISH_DEAL(Position p)
         {
+            // 1. Closed last position
+            // 2. Closed recovery position with profit and kept main position 
+
             if (p != null && p.State == PositionStateType.Done)
             {
                 bool closingPositionByTakeProfit =
@@ -184,16 +157,73 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private void Set_TP_Order_LONG(Position p)
+        private bool RecognizeAndSetupPosition(Position p)
         {
-            decimal TP_price = Calc_TP_Price_LONG(p.EntryPrice);
-            _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
+            bool newDeal = _mainPosition == null;
+            if (newDeal)
+            {
+                _mainPosition = p;
+                _dealGuid = Guid.NewGuid().ToString();
+            }
+            else
+            {
+                _recoveryPosition = p;
+            }
+            p.DealGuid = _dealGuid;
+            return newDeal;
         }
 
-        private void Set_TP_Order_SHORT(Position p)
+        private void CancelOpposite_EP_Order()
         {
-            decimal TP_price = Calc_TP_Price_SHORT(p.EntryPrice);
-            _bot.CloseAtProfit(p, TP_price, p.OpenVolume);
+            if (_mainPosition != null)
+            {
+                if (_mainPosition.Direction == Side.Buy)
+                {
+                    _bot.SellAtStopCancel();
+                }
+                else if (_mainPosition.Direction == Side.Sell)
+                {
+                    _bot.BuyAtStopCancel();
+                }
+            }
+        }
+
+        private void SetMainPositionInitial_TP_Order()
+        {
+            decimal TP_price = _mainPosition.Direction == Side.Buy ?
+                Calc_TP_Price_LONG(_mainPosition.EntryPrice) :
+                Calc_TP_Price_SHORT(_mainPosition.EntryPrice);
+            Set_TP_Order(_mainPosition, TP_price);
+        }
+
+        private void SetFirstRecovery_EP_Order()
+        {
+            decimal mainPosition_EP_Price = _mainPosition.EntryPrice;
+            if (_mainPosition.Direction == Side.Buy)
+            {
+                Set_EN_Order_SHORT(Calc_EP_FirstRecoveryPrice_LONG(mainPosition_EP_Price));
+            }
+            else if (_mainPosition.Direction == Side.Sell)
+            {
+                Set_EN_Order_LONG(Calc_EP_FirstRecoveryPrice_SHORT(mainPosition_EP_Price));
+            }
+        }
+
+        private void SetBothPositionsTo_BE_PriceExit()
+        {
+            decimal BE_price = Calc_BE_Price();
+            Set_TP_Order(_mainPosition, BE_price);
+            Set_SL_Order(_recoveryPosition, BE_price);
+        }
+
+        private void Set_TP_Order(Position p, decimal TP_price)
+        {
+            _bot.CloseAtProfit(p, TP_price, TP_price);
+        }
+
+        private void Set_SL_Order(Position p, decimal SL_price)
+        {
+            _bot.CloseAtStop(p, SL_price, SL_price);
         }
 
         private void Set_EN_Order_LONG(decimal entryPrice)
@@ -234,13 +264,20 @@ namespace OsEngine.Robots.Oleg.Good
             return mainEntryPrice + _squeezeSize * FirstRecoveryDistanceInSqueezes.ValueDecimal;
         }
 
-        private decimal Calc_BE_Price_MAIN_LONG(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short)
+        private decimal Calc_BE_Price()
+        {
+            return _recoveryPosition.Direction == Side.Buy ?
+                Calc_BE_Price_MAIN_is_SHORT(_recoveryPosition.OpenVolume, _mainPosition.OpenVolume, _recoveryPosition.EntryPrice, _mainPosition.EntryPrice) :
+                Calc_BE_Price_MAIN_is_LONG(_mainPosition.OpenVolume, _recoveryPosition.OpenVolume, _mainPosition.EntryPrice, _recoveryPosition.EntryPrice);
+        }
+
+        private decimal Calc_BE_Price_MAIN_is_LONG(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short)
         {
             decimal fee = _bot.ComissionValue;
             return (volLong * EP_Long * (100 + fee) + volShort * EP_Short * (fee - 100)) / (volLong * (100 - fee) - volShort * (fee + 100));
         }
 
-        private decimal Calc_BE_Price_MAIN_SHORT(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short)
+        private decimal Calc_BE_Price_MAIN_is_SHORT(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short)
         {
             decimal fee = _bot.ComissionValue;
             return (volLong * EP_Long * (100 + fee) - volShort * EP_Short * (100 - fee)) / (volLong * (100 - fee) - volShort * (100 + fee));
