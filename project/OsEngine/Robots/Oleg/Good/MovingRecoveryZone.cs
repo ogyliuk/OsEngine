@@ -119,14 +119,16 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (p != null && p.State == PositionStateType.Open)
             {
-                bool mainPositionOpened = RecognizeAndSetupPosition(p);
-                if (mainPositionOpened)
+                RecognizeAndSetupPosition(p);
+
+                if (GetPositionsState() == PositionsState.MAIN_ONLY)
                 {
                     CancelOpposite_EP_Order();
                     SetMainPositionInitial_TP_Order();
                     SetFirstRecovery_EP_Order();
                 }
-                else
+
+                if (GetPositionsState() == PositionsState.MAIN_AND_RECOVERY)
                 {
                     SetBothPositionsTo_BE_PriceExit();
                 }
@@ -157,7 +159,7 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
-        private bool RecognizeAndSetupPosition(Position p)
+        private void RecognizeAndSetupPosition(Position p)
         {
             bool newDeal = _mainPosition == null;
             if (newDeal)
@@ -170,7 +172,15 @@ namespace OsEngine.Robots.Oleg.Good
                 _recoveryPosition = p;
             }
             p.DealGuid = _dealGuid;
-            return newDeal;
+        }
+
+        private PositionsState GetPositionsState()
+        {
+            if (_mainPosition != null)
+            {
+                return _recoveryPosition != null ? PositionsState.MAIN_AND_RECOVERY : PositionsState.MAIN_ONLY;
+            }
+            throw new InvalidOperationException("Unknown PositionsState!");
         }
 
         private void CancelOpposite_EP_Order()
@@ -346,5 +356,11 @@ namespace OsEngine.Robots.Oleg.Good
     {
         FREE,
         SQUEEZE_FOUND
+    }
+
+    enum PositionsState
+    {
+        MAIN_ONLY,
+        MAIN_AND_RECOVERY
     }
 }
