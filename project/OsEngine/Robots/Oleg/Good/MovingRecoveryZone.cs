@@ -35,6 +35,9 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterDecimal CleanProfitPercent;
         private StrategyParameterDecimal FirstRecoveryDistanceInSqueezes;
 
+        private bool HasMainPosition { get { return _mainPosition != null; } }
+        private bool HasRecoveryPosition { get { return _recoveryPosition != null; } }
+
         public MovingRecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
             TabCreate(BotTabType.Simple);
@@ -137,26 +140,50 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void event_PositionClosed_CONTINUE_OR_FINISH_DEAL(Position p)
         {
-            // 1. Closed last position
-            // 2. Closed recovery position with profit and kept main position 
-
             if (p != null && p.State == PositionStateType.Done)
             {
-                bool closingPositionByTakeProfit =
-                    (p.Direction == Side.Sell && p.EntryPrice > p.ClosePrice) ||
-                    (p.Direction == Side.Buy && p.EntryPrice < p.ClosePrice);
-                bool closingLastPosition = _bot.PositionsOpenAll.Count == 0;
-                bool noMoreEntryOrdersSet = _bot.PositionOpenerToStopsAll.Count == 0;
-                if (closingLastPosition && (noMoreEntryOrdersSet || closingPositionByTakeProfit))
+                bool mainPositionClosing = HasMainPosition && p.Number == _mainPosition.Number;
+                if (mainPositionClosing)
                 {
-                    _bot.BuyAtStopCancel();
-                    _bot.SellAtStopCancel();
-                    _state = TradingState.FREE;
-                    _dealGuid = String.Empty;
+                    if (!HasRecoveryPosition)
+                    {
+                        bool hasEntryOrdersSet = _bot.PositionOpenerToStopsAll.Count > 0;
+                        if (hasEntryOrdersSet)
+                        {
+                            _bot.BuyAtStopCancel();
+                            _bot.SellAtStopCancel();
+                        }
+                        _dealGuid = String.Empty;
+                        _state = TradingState.FREE;
+                    }
                     _mainPosition = null;
+                }
+
+                bool recoveryPositionClosing = HasRecoveryPosition && p.Number == _recoveryPosition.Number;
+                if (recoveryPositionClosing)
+                {
+                    if (HasMainPosition)
+                    {
+                        if (IsPositionInProfit(p))
+                        {
+                            // 1. надо передвинуть main TP
+                            // 2. надо снова поставить вход на то что выиграли в 1 (и учесть комиссию)
+                        }
+                    }
+                    else
+                    {
+                        _dealGuid = String.Empty;
+                        _state = TradingState.FREE;
+                    }
                     _recoveryPosition = null;
                 }
             }
+        }
+
+        private bool IsPositionInProfit(Position p)
+        {
+            return (p.Direction == Side.Sell && p.EntryPrice > p.ClosePrice) || 
+                (p.Direction == Side.Buy && p.EntryPrice < p.ClosePrice);
         }
 
         private void RecognizeAndSetupPosition(Position p)
