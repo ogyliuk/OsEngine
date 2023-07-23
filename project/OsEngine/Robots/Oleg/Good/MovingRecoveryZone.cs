@@ -35,8 +35,19 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterDecimal CleanProfitPercent;
         private StrategyParameterDecimal FirstRecoveryDistanceInSqueezes;
 
-        private bool HasMainPosition { get { return _mainPosition != null; } }
-        private bool HasRecoveryPosition { get { return _recoveryPosition != null; } }
+        private bool MainPositionExists { get { return _mainPosition != null; } }
+        private bool RecoveryPositionExists { get { return _recoveryPosition != null; } }
+        private PositionsState PositionsState
+        {
+            get
+            {
+                if (_mainPosition != null)
+                {
+                    return RecoveryPositionExists ? PositionsState.MAIN_AND_RECOVERY : PositionsState.MAIN_ONLY;
+                }
+                throw new InvalidOperationException("Unknown PositionsState!");
+            }
+        }
 
         public MovingRecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
@@ -124,14 +135,14 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 RecognizeAndSetupPosition(p);
 
-                if (GetPositionsState() == PositionsState.MAIN_ONLY)
+                if (PositionsState == PositionsState.MAIN_ONLY)
                 {
                     CancelOpposite_EP_Order();
                     SetMainPositionInitial_TP_Order();
                     SetFirstRecovery_EP_Order();
                 }
 
-                if (GetPositionsState() == PositionsState.MAIN_AND_RECOVERY)
+                if (PositionsState == PositionsState.MAIN_AND_RECOVERY)
                 {
                     SetBothPositionsTo_BE_PriceExit();
                 }
@@ -142,48 +153,58 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (p != null && p.State == PositionStateType.Done)
             {
-                bool mainPositionClosing = HasMainPosition && p.Number == _mainPosition.Number;
-                if (mainPositionClosing)
+                if (IsMainPosition(p))
                 {
-                    if (!HasRecoveryPosition)
+                    if (!RecoveryPositionExists)
                     {
-                        bool hasEntryOrdersSet = _bot.PositionOpenerToStopsAll.Count > 0;
-                        if (hasEntryOrdersSet)
-                        {
-                            _bot.BuyAtStopCancel();
-                            _bot.SellAtStopCancel();
-                        }
-                        _dealGuid = String.Empty;
-                        _state = TradingState.FREE;
+                        FinishDeal();
                     }
                     _mainPosition = null;
                 }
 
-                bool recoveryPositionClosing = HasRecoveryPosition && p.Number == _recoveryPosition.Number;
-                if (recoveryPositionClosing)
+                if (IsRecoveryPosition(p))
                 {
-                    if (HasMainPosition)
+                    if (!MainPositionExists)
                     {
-                        if (IsPositionInProfit(p))
-                        {
-                            // 1. надо передвинуть main TP
-                            // 2. надо снова поставить вход на то что выиграли в 1 (и учесть комиссию)
-                        }
+                        FinishDeal();
                     }
-                    else
+                    else if (SomeLossRecovered())
                     {
-                        _dealGuid = String.Empty;
-                        _state = TradingState.FREE;
+                        SetMainPosition_TP_OnFullLossRecovery();
+                        SetNextRecovery_EP_Order();
                     }
                     _recoveryPosition = null;
                 }
             }
         }
 
-        private bool IsPositionInProfit(Position p)
+        private void FinishDeal()
         {
-            return (p.Direction == Side.Sell && p.EntryPrice > p.ClosePrice) || 
-                (p.Direction == Side.Buy && p.EntryPrice < p.ClosePrice);
+            bool hasEntryOrdersSet = _bot.PositionOpenerToStopsAll.Count > 0;
+            if (hasEntryOrdersSet)
+            {
+                _bot.BuyAtStopCancel();
+                _bot.SellAtStopCancel();
+            }
+            _dealGuid = String.Empty;
+            _state = TradingState.FREE;
+        }
+
+        private bool IsMainPosition(Position p)
+        {
+            return MainPositionExists && p.Number == _mainPosition.Number;
+        }
+
+        private bool IsRecoveryPosition(Position p)
+        {
+            return RecoveryPositionExists && p.Number == _recoveryPosition.Number;
+        }
+
+        private bool SomeLossRecovered()
+        {
+            bool longRecoveryMadeProfit = _recoveryPosition.Direction == Side.Buy && _recoveryPosition.EntryPrice < _recoveryPosition.ClosePrice;
+            bool shortRecoveryMadeProfit = _recoveryPosition.Direction == Side.Sell && _recoveryPosition.EntryPrice > _recoveryPosition.ClosePrice;
+            return longRecoveryMadeProfit || shortRecoveryMadeProfit;
         }
 
         private void RecognizeAndSetupPosition(Position p)
@@ -199,15 +220,6 @@ namespace OsEngine.Robots.Oleg.Good
                 _recoveryPosition = p;
             }
             p.DealGuid = _dealGuid;
-        }
-
-        private PositionsState GetPositionsState()
-        {
-            if (_mainPosition != null)
-            {
-                return _recoveryPosition != null ? PositionsState.MAIN_AND_RECOVERY : PositionsState.MAIN_ONLY;
-            }
-            throw new InvalidOperationException("Unknown PositionsState!");
         }
 
         private void CancelOpposite_EP_Order()
@@ -233,6 +245,13 @@ namespace OsEngine.Robots.Oleg.Good
             Set_TP_Order(_mainPosition, TP_price);
         }
 
+        private void SetMainPosition_TP_OnFullLossRecovery()
+        {
+            // TODO : calc right price here
+            decimal fullLossRecovery_TP_Price = 0;
+            Set_TP_Order(_mainPosition, fullLossRecovery_TP_Price);
+        }
+
         private void SetFirstRecovery_EP_Order()
         {
             decimal mainPosition_EP_Price = _mainPosition.EntryPrice;
@@ -243,6 +262,22 @@ namespace OsEngine.Robots.Oleg.Good
             else if (_mainPosition.Direction == Side.Sell)
             {
                 Set_EN_Order_LONG(Calc_EP_FirstRecoveryPrice_SHORT(mainPosition_EP_Price));
+            }
+        }
+
+        private void SetNextRecovery_EP_Order()
+        {
+            if (_mainPosition.Direction == Side.Buy)
+            {
+                // TODO : calc right price here (consider recovered loss amount)
+                decimal nextRecovery_EP_PriceShort = 0;
+                Set_EN_Order_SHORT(nextRecovery_EP_PriceShort);
+            }
+            else if (_mainPosition.Direction == Side.Sell)
+            {
+                // TODO : calc right price here (consider recovered loss amount)
+                decimal nextRecovery_EP_PriceLong = 0;
+                Set_EN_Order_LONG(nextRecovery_EP_PriceLong);
             }
         }
 
