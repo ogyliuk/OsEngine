@@ -13,7 +13,6 @@ namespace OsEngine.Robots.Oleg.Good
     public class MovingRecoveryZone : BotPanel
     {
         private BotTabSimple _bot;
-        private TradingState _state;
         private decimal _balanceOnStart;
         private decimal _squeezeSize;
         private string _dealGuid;
@@ -37,23 +36,12 @@ namespace OsEngine.Robots.Oleg.Good
 
         private bool MainPositionExists { get { return _mainPosition != null; } }
         private bool RecoveryPositionExists { get { return _recoveryPosition != null; } }
-        private PositionsState PositionsState
-        {
-            get
-            {
-                if (_mainPosition != null)
-                {
-                    return RecoveryPositionExists ? PositionsState.MAIN_AND_RECOVERY : PositionsState.MAIN_ONLY;
-                }
-                throw new InvalidOperationException("Unknown PositionsState!");
-            }
-        }
+        private bool HasEntryOrdersSet { get { return _bot.PositionOpenerToStopsAll.Count > 0; } }
 
         public MovingRecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
             TabCreate(BotTabType.Simple);
             _bot = TabsSimple[0];
-            _state = TradingState.FREE;
             _dealGuid = String.Empty;
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
@@ -106,25 +94,38 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void event_CandleClosed_SQUEEZE_FOUND(List<Candle> candles)
         {
-            // 1. No deal yet (set initial EP for both directions)
-            // 2. Recovery in progress (probably close recovery position + set new recovery EP + shift main TP)
-
             if (IsEnoughDataAndEnabledToTrade())
             {
-                bool freeState = _state == TradingState.FREE;
-                bool noPositions = _bot.PositionsOpenAll.Count == 0;
                 bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
-                if (freeState && noPositions && lastCandleHasSqueeze)
+                if (lastCandleHasSqueeze)
                 {
-                    _state = TradingState.SQUEEZE_FOUND;
-                    _balanceOnStart = _bot.Portfolio.ValueCurrent;
+                    bool noDeal = !MainPositionExists && !RecoveryPositionExists && !HasEntryOrdersSet;
+                    if (noDeal)
+                    {
+                        StartDeal();
+                    }
 
-                    decimal squeezeUpBand = _bollingerWithSqueeze.ValuesUp.Last();
-                    decimal squeezeDownBand = _bollingerWithSqueeze.ValuesDown.Last();
-                    Set_EN_Order_LONG(squeezeUpBand);
-                    Set_EN_Order_SHORT(squeezeDownBand);
-
-                    _squeezeSize = squeezeUpBand - squeezeDownBand;
+                    bool recoveryInProgress = MainPositionExists && RecoveryPositionExists;
+                    if (recoveryInProgress)
+                    {
+                        bool goodSizeRecovered = true; // TODO : calculate
+                        if (goodSizeRecovered)
+                        {
+                            bool alreadyShiftedRecovery_SL = _recoveryPosition.StopOrderPrice != _mainPosition.ProfitOrderPrice;
+                            if (alreadyShiftedRecovery_SL)
+                            {
+                                bool canShirtToBetterPlace = true; // TODO : calculate
+                                if (canShirtToBetterPlace)
+                                {
+                                    // TODO : Shift recovery SL if in nice profit
+                                }
+                            }
+                            else
+                            {
+                                // TODO : Shift recovery SL if in nice profit
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -135,16 +136,18 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 RecognizeAndSetupPosition(p);
 
-                if (PositionsState == PositionsState.MAIN_ONLY)
+                if (MainPositionExists)
                 {
-                    CancelOpposite_EP_Order();
-                    SetMainPositionInitial_TP_Order();
-                    SetFirstRecovery_EP_Order();
-                }
-
-                if (PositionsState == PositionsState.MAIN_AND_RECOVERY)
-                {
-                    SetBothPositionsTo_BE_PriceExit();
+                    if (RecoveryPositionExists)
+                    {
+                        SetBothPositionsTo_BE_PriceExit();
+                    }
+                    else
+                    {
+                        CancelOpposite_EP_Order();
+                        SetMainPositionInitial_TP_Order();
+                        SetFirstRecovery_EP_Order();
+                    }
                 }
             }
         }
@@ -178,16 +181,24 @@ namespace OsEngine.Robots.Oleg.Good
             }
         }
 
+        private void StartDeal()
+        {
+            _balanceOnStart = _bot.Portfolio.ValueCurrent;
+            decimal squeezeUpBand = _bollingerWithSqueeze.ValuesUp.Last();
+            decimal squeezeDownBand = _bollingerWithSqueeze.ValuesDown.Last();
+            Set_EN_Order_LONG(squeezeUpBand);
+            Set_EN_Order_SHORT(squeezeDownBand);
+            _squeezeSize = squeezeUpBand - squeezeDownBand;
+        }
+
         private void FinishDeal()
         {
-            bool hasEntryOrdersSet = _bot.PositionOpenerToStopsAll.Count > 0;
-            if (hasEntryOrdersSet)
+            if (HasEntryOrdersSet)
             {
                 _bot.BuyAtStopCancel();
                 _bot.SellAtStopCancel();
             }
             _dealGuid = String.Empty;
-            _state = TradingState.FREE;
         }
 
         private bool IsMainPosition(Position p)
@@ -412,17 +423,5 @@ namespace OsEngine.Robots.Oleg.Good
             bool enoughCandlesForBollingerSqueeze = candlesCount > BollingerSqueezePeriod.ValueInt;
             return robotEnabled && enoughCandlesForBollinger && enoughCandlesForBollingerSqueeze;
         }
-    }
-
-    enum TradingState
-    {
-        FREE,
-        SQUEEZE_FOUND
-    }
-
-    enum PositionsState
-    {
-        MAIN_ONLY,
-        MAIN_AND_RECOVERY
     }
 }
