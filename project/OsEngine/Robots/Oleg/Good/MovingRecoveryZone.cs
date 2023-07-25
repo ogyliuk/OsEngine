@@ -105,26 +105,10 @@ namespace OsEngine.Robots.Oleg.Good
                         StartDeal();
                     }
 
-                    bool recoveryInProgress = MainPositionExists && RecoveryPositionExists;
-                    if (recoveryInProgress)
+                    bool recoveringDeal = MainPositionExists && RecoveryPositionExists;
+                    if (recoveringDeal)
                     {
-                        bool goodSizeRecovered = true; // TODO : calculate
-                        if (goodSizeRecovered)
-                        {
-                            bool alreadyShiftedRecovery_SL = _recoveryPosition.StopOrderPrice != _mainPosition.ProfitOrderPrice;
-                            if (alreadyShiftedRecovery_SL)
-                            {
-                                bool canShirtToBetterPlace = true; // TODO : calculate
-                                if (canShirtToBetterPlace)
-                                {
-                                    // TODO : Shift recovery SL if in nice profit
-                                }
-                            }
-                            else
-                            {
-                                // TODO : Shift recovery SL if in nice profit
-                            }
-                        }
+                        TryMovingRecoveryTrailing_SL();
                     }
                 }
             }
@@ -199,6 +183,19 @@ namespace OsEngine.Robots.Oleg.Good
                 _bot.SellAtStopCancel();
             }
             _dealGuid = String.Empty;
+        }
+
+        private void TryMovingRecoveryTrailing_SL()
+        {
+            bool canRecoverGoodPortionNow = true; // TODO : calculate
+            if (canRecoverGoodPortionNow)
+            {
+                bool canShiftToBetterPlace = true; // TODO : calculate
+                if (canShiftToBetterPlace)
+                {
+                    // TODO : Shift recovery SL
+                }
+            }
         }
 
         private bool IsMainPosition(Position p)
