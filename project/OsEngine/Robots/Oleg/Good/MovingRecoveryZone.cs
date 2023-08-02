@@ -12,10 +12,13 @@ namespace OsEngine.Robots.Oleg.Good
     [Bot("MovingRecoveryZone")]
     public class MovingRecoveryZone : BotPanel
     {
+        private static readonly String STATIC = "Static";
+        private static readonly String REINVESTMENT = "Reinvestment";
+
         private BotTabSimple _bot;
+        private string _dealGuid;
         private decimal _balanceOnStart;
         private decimal _squeezeSize;
-        private string _dealGuid;
 
         private Position _mainPosition;
         private Position _recoveryPosition;
@@ -28,6 +31,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         private StrategyParameterString Regime;
         private StrategyParameterDecimal RecoveryVolumeMultiplier;
+        private StrategyParameterString RecoveryVolumeMode;
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
 
@@ -46,6 +50,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
+            RecoveryVolumeMode = CreateParameter("Recovery volume mode", STATIC, new[] { STATIC, REINVESTMENT }, "Base");
             RecoveryVolumeMultiplier = CreateParameter("Recovery volume multiplier", 0.8m, 0.8m, 0.9m, 0.05m, "Base");
 
             MinVolumeUSDT = CreateParameter("Min Volume USDT", 7m, 7m, 7m, 1m, "Base");
@@ -90,11 +95,17 @@ namespace OsEngine.Robots.Oleg.Good
                 _bollingerWithSqueeze.Reload();
                 _bollingerWithSqueeze.Save();
             }
+
+            bool volumeMultiplierValid = RecoveryVolumeMultiplier.ValueDecimal > 0 && RecoveryVolumeMultiplier.ValueDecimal < 1;
+            if (!volumeMultiplierValid)
+            {
+                throw new Exception("Volume multiplier value is INVALID! It must be > 0 and < 1");
+            }
         }
 
         private void event_CandleClosed_SQUEEZE_FOUND(List<Candle> candles)
         {
-            if (IsEnoughDataAndEnabledToTrade())
+            if (IsEnoughDataAndEnoughMoneyAndEnabledToTrade())
             {
                 bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
                 if (lastCandleHasSqueeze)
@@ -119,6 +130,7 @@ namespace OsEngine.Robots.Oleg.Good
             if (p != null && p.State == PositionStateType.Open)
             {
                 RecognizeAndSetupPosition(p);
+                SwapPositionsIfNeeded();
 
                 if (MainPositionExists)
                 {
@@ -230,6 +242,20 @@ namespace OsEngine.Robots.Oleg.Good
             p.DealGuid = _dealGuid;
         }
 
+        private void SwapPositionsIfNeeded()
+        {
+            if (MainPositionExists && RecoveryPositionExists)
+            {
+                bool recoveryPositionLarger = _mainPosition.OpenVolume < _recoveryPosition.OpenVolume;
+                if (recoveryPositionLarger)
+                {
+                    Position bufferPosition = _mainPosition;
+                    _mainPosition = _recoveryPosition;
+                    _recoveryPosition = bufferPosition;
+                }
+            }
+        }
+
         private void CancelOpposite_EP_Order()
         {
             if (_mainPosition != null)
@@ -308,7 +334,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order_LONG(decimal entryPrice)
         {
-            decimal buyCoinsVolume = GetNewAttemptCoinsVolume(Side.Buy);
+            decimal buyCoinsVolume = CalcMainPositionCoinsVolume(Side.Buy);
             if (buyCoinsVolume > 0)
             {
                 _bot.BuyAtStop(buyCoinsVolume, entryPrice, entryPrice, StopActivateType.HigherOrEqual, 100000);
@@ -317,7 +343,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order_SHORT(decimal entryPrice)
         {
-            decimal sellCoinsVolume = GetNewAttemptCoinsVolume(Side.Sell);
+            decimal sellCoinsVolume = CalcMainPositionCoinsVolume(Side.Sell);
             if (sellCoinsVolume > 0)
             {
                 _bot.SellAtStop(sellCoinsVolume, entryPrice, entryPrice, StopActivateType.LowerOrEqyal, 100000);
@@ -363,19 +389,61 @@ namespace OsEngine.Robots.Oleg.Good
             return (volLong * EP_Long * (100 + fee) - volShort * EP_Short * (100 - fee)) / (volLong * (100 - fee) - volShort * (100 + fee));
         }
 
-        private decimal GetNewAttemptCoinsVolume(Side side)
+        private decimal CalcMainPositionCoinsVolume(Side side)
         {
             decimal coinsVolume = 0;
-            if (HasMoneyForNewAttempt() && !IsMoneyForNewAttemptTooSmall())
+            decimal mainPositionVolumeInMoney = CalcInitialMoneyVolume_MainPosition();
+            if (mainPositionVolumeInMoney > 0)
             {
-                decimal moneyAvailableForNewAttempt = GetNewAttemptMoneyNeeded();
-                decimal moneyNeededForFee = moneyAvailableForNewAttempt / 100 * _bot.ComissionValue;
-                decimal moneyLeftForCoins = moneyAvailableForNewAttempt - moneyNeededForFee;
+                decimal moneyNeededForFee = mainPositionVolumeInMoney / 100 * _bot.ComissionValue;
+                decimal moneyLeftForCoins = mainPositionVolumeInMoney - moneyNeededForFee;
                 decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
                 decimal volume = moneyLeftForCoins / price;
                 coinsVolume = Math.Round(volume, VolumeDecimals.ValueInt);
             }
             return coinsVolume;
+        }
+
+        private decimal CalcRecoveryPositionCoinsVolume(Side side)
+        {
+            decimal coinsVolume = 0;
+            decimal recoveryPositionVolumeInMoney = CalcInitialMoneyVolume_RecoveryPosition();
+            if (recoveryPositionVolumeInMoney > 0)
+            {
+                if (RecoveryVolumeMode.ValueString == REINVESTMENT)
+                {
+                    decimal alreadyRecoveredLossMoney = 0; // TODO : calculate
+                    recoveryPositionVolumeInMoney += alreadyRecoveredLossMoney;
+                }
+
+                decimal moneyNeededForFee = recoveryPositionVolumeInMoney / 100 * _bot.ComissionValue;
+                decimal moneyLeftForCoins = recoveryPositionVolumeInMoney - moneyNeededForFee;
+                decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
+                decimal volume = moneyLeftForCoins / price;
+                coinsVolume = Math.Round(volume, VolumeDecimals.ValueInt);
+            }
+            return coinsVolume;
+        }
+
+        private decimal CalcInitialMoneyVolume_MainPosition()
+        {
+            decimal mainPositionVolumeInPercents, recoveryPositionVolumeInPercents, totalDealVolumeInPercents;
+            CalcVolumePercentages(out mainPositionVolumeInPercents, out recoveryPositionVolumeInPercents, out totalDealVolumeInPercents);
+            return _balanceOnStart * mainPositionVolumeInPercents / totalDealVolumeInPercents;
+        }
+
+        private decimal CalcInitialMoneyVolume_RecoveryPosition()
+        {
+            decimal mainPositionVolumeInPercents, recoveryPositionVolumeInPercents, totalDealVolumeInPercents;
+            CalcVolumePercentages(out mainPositionVolumeInPercents, out recoveryPositionVolumeInPercents, out totalDealVolumeInPercents);
+            return _balanceOnStart * recoveryPositionVolumeInPercents / totalDealVolumeInPercents;
+        }
+
+        private void CalcVolumePercentages(out decimal mainPositionVolumeInPercents, out decimal recoveryPositionVolumeInPercents, out decimal totalDealVolumeInPercents)
+        {
+            mainPositionVolumeInPercents = 100;
+            recoveryPositionVolumeInPercents = RecoveryVolumeMultiplier.ValueDecimal * mainPositionVolumeInPercents;
+            totalDealVolumeInPercents = mainPositionVolumeInPercents + recoveryPositionVolumeInPercents;
         }
 
         private bool IsMoneyForNewAttemptTooSmall()
@@ -412,13 +480,14 @@ namespace OsEngine.Robots.Oleg.Good
             return p.OpenVolume * p.EntryPrice + p.CommissionTotal();
         }
 
-        private bool IsEnoughDataAndEnabledToTrade()
+        private bool IsEnoughDataAndEnoughMoneyAndEnabledToTrade()
         {
             int candlesCount = _bot.CandlesAll != null ? _bot.CandlesAll.Count : 0;
             bool robotEnabled = Regime.ValueString == "On";
             bool enoughCandlesForBollinger = candlesCount > BollingerLength.ValueInt;
             bool enoughCandlesForBollingerSqueeze = candlesCount > BollingerSqueezePeriod.ValueInt;
-            return robotEnabled && enoughCandlesForBollinger && enoughCandlesForBollingerSqueeze;
+            bool enoughMoney = CalcInitialMoneyVolume_RecoveryPosition() >= MinVolumeUSDT.ValueDecimal;
+            return robotEnabled && enoughCandlesForBollinger && enoughCandlesForBollingerSqueeze && enoughMoney;
         }
     }
 }
