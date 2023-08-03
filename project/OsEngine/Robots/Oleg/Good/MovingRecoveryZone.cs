@@ -132,7 +132,7 @@ namespace OsEngine.Robots.Oleg.Good
                     bool recoveringDeal = MainPositionExists && RecoveryPositionExists;
                     if (recoveringDeal)
                     {
-                        TryMovingRecoveryTrailing_SL();
+                        MoveRecoveryTrailing_SL_IfPossible();
                     }
                 }
             }
@@ -178,14 +178,14 @@ namespace OsEngine.Robots.Oleg.Good
 
                 if (IsRecoveryPosition(p))
                 {
-                    if (!MainPositionExists)
-                    {
-                        FinishDeal();
-                    }
-                    else if (SomeLossRecovered())
+                    if (MainPositionExists)
                     {
                         SetMainPosition_TP_OnFullLossRecovery();
                         SetNextRecovery_EP_Order();
+                    }
+                    else
+                    {
+                        FinishDeal();
                     }
                     _recoveryPosition = null;
                 }
@@ -213,7 +213,7 @@ namespace OsEngine.Robots.Oleg.Good
             _dealPositions = new List<Position>();
         }
 
-        private void TryMovingRecoveryTrailing_SL()
+        private void MoveRecoveryTrailing_SL_IfPossible()
         {
             bool canRecoverGoodPortionNow = true; // TODO : calculate
             if (canRecoverGoodPortionNow)
@@ -234,13 +234,6 @@ namespace OsEngine.Robots.Oleg.Good
         private bool IsRecoveryPosition(Position p)
         {
             return RecoveryPositionExists && p.Number == _recoveryPosition.Number;
-        }
-
-        private bool SomeLossRecovered()
-        {
-            bool longRecoveryMadeProfit = _recoveryPosition.Direction == Side.Buy && _recoveryPosition.EntryPrice < _recoveryPosition.ClosePrice;
-            bool shortRecoveryMadeProfit = _recoveryPosition.Direction == Side.Sell && _recoveryPosition.EntryPrice > _recoveryPosition.ClosePrice;
-            return longRecoveryMadeProfit || shortRecoveryMadeProfit;
         }
 
         private void RecognizeAndSetupPosition(Position p)
