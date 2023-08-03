@@ -19,6 +19,7 @@ namespace OsEngine.Robots.Oleg.Good
         private string _dealGuid;
         private decimal _balanceOnStart;
         private decimal _squeezeSize;
+        private List<Position> _dealPositions;
 
         private Position _mainPosition;
         private Position _recoveryPosition;
@@ -34,6 +35,7 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterString RecoveryVolumeMode;
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
+        // private StrategyParameterDecimal MinWantedProfitPercent; - TODO : think to use
 
         private StrategyParameterDecimal CleanProfitPercent;
         private StrategyParameterDecimal FirstRecoveryDistanceInSqueezes;
@@ -41,12 +43,23 @@ namespace OsEngine.Robots.Oleg.Good
         private bool MainPositionExists { get { return _mainPosition != null; } }
         private bool RecoveryPositionExists { get { return _recoveryPosition != null; } }
         private bool HasEntryOrdersSet { get { return _bot.PositionOpenerToStopsAll.Count > 0; } }
+        private decimal GainedProfitMoney
+        {
+            get
+            {
+                return _dealPositions
+                    .Where(p => p.State == PositionStateType.Done)
+                    .Select(p => CalcPositionCleanProfitMoney(p))
+                    .Sum();
+            }
+        }
 
         public MovingRecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
             TabCreate(BotTabType.Simple);
             _bot = TabsSimple[0];
             _dealGuid = String.Empty;
+            _dealPositions = new List<Position>();
 
             Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in Volume", 0, 0, 4, 1, "Base");
@@ -145,6 +158,8 @@ namespace OsEngine.Robots.Oleg.Good
                         SetFirstRecovery_EP_Order();
                     }
                 }
+
+                _dealPositions.Add(p);
             }
         }
 
@@ -195,6 +210,7 @@ namespace OsEngine.Robots.Oleg.Good
                 _bot.SellAtStopCancel();
             }
             _dealGuid = String.Empty;
+            _dealPositions = new List<Position>();
         }
 
         private void TryMovingRecoveryTrailing_SL()
@@ -303,15 +319,11 @@ namespace OsEngine.Robots.Oleg.Good
         {
             if (_mainPosition.Direction == Side.Buy)
             {
-                // TODO : calc right price here (consider recovered loss amount)
-                decimal nextRecovery_EP_PriceShort = 0;
-                Set_EN_Order_SHORT(nextRecovery_EP_PriceShort);
+                Set_EN_Order_SHORT(Calc_EP_NextRecoveryPrice_LONG());
             }
             else if (_mainPosition.Direction == Side.Sell)
             {
-                // TODO : calc right price here (consider recovered loss amount)
-                decimal nextRecovery_EP_PriceLong = 0;
-                Set_EN_Order_LONG(nextRecovery_EP_PriceLong);
+                Set_EN_Order_LONG(Calc_EP_NextRecoveryPrice_SHORT());
             }
         }
 
@@ -334,7 +346,9 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order_LONG(decimal entryPrice)
         {
-            decimal buyCoinsVolume = CalcMainPositionCoinsVolume(Side.Buy);
+            decimal buyCoinsVolume = MainPositionExists ? 
+                CalcCoinsVolume_MainPosition(Side.Buy) : 
+                CalcCoinsVolume_RecoveryPosition(Side.Buy);
             if (buyCoinsVolume > 0)
             {
                 _bot.BuyAtStop(buyCoinsVolume, entryPrice, entryPrice, StopActivateType.HigherOrEqual, 100000);
@@ -343,7 +357,9 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order_SHORT(decimal entryPrice)
         {
-            decimal sellCoinsVolume = CalcMainPositionCoinsVolume(Side.Sell);
+            decimal sellCoinsVolume = MainPositionExists ? 
+                CalcCoinsVolume_MainPosition(Side.Sell) : 
+                CalcCoinsVolume_RecoveryPosition(Side.Sell);
             if (sellCoinsVolume > 0)
             {
                 _bot.SellAtStop(sellCoinsVolume, entryPrice, entryPrice, StopActivateType.LowerOrEqyal, 100000);
@@ -370,6 +386,18 @@ namespace OsEngine.Robots.Oleg.Good
             return mainEntryPrice + _squeezeSize * FirstRecoveryDistanceInSqueezes.ValueDecimal;
         }
 
+        private decimal Calc_EP_NextRecoveryPrice_LONG()
+        {
+            // TODO : calculate (consider recovered loss amount)
+            return 0;
+        }
+
+        private decimal Calc_EP_NextRecoveryPrice_SHORT()
+        {
+            // TODO : calculate (consider recovered loss amount)
+            return 0;
+        }
+
         private decimal Calc_BE_Price()
         {
             return _recoveryPosition.Direction == Side.Buy ?
@@ -389,22 +417,18 @@ namespace OsEngine.Robots.Oleg.Good
             return (volLong * EP_Long * (100 + fee) - volShort * EP_Short * (100 - fee)) / (volLong * (100 - fee) - volShort * (100 + fee));
         }
 
-        private decimal CalcMainPositionCoinsVolume(Side side)
+        private decimal CalcCoinsVolume_MainPosition(Side side)
         {
             decimal coinsVolume = 0;
             decimal mainPositionVolumeInMoney = CalcInitialMoneyVolume_MainPosition();
             if (mainPositionVolumeInMoney > 0)
             {
-                decimal moneyNeededForFee = mainPositionVolumeInMoney / 100 * _bot.ComissionValue;
-                decimal moneyLeftForCoins = mainPositionVolumeInMoney - moneyNeededForFee;
-                decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
-                decimal volume = moneyLeftForCoins / price;
-                coinsVolume = Math.Round(volume, VolumeDecimals.ValueInt);
+                coinsVolume = ConvertMoneyToCoins(side, mainPositionVolumeInMoney);
             }
             return coinsVolume;
         }
 
-        private decimal CalcRecoveryPositionCoinsVolume(Side side)
+        private decimal CalcCoinsVolume_RecoveryPosition(Side side)
         {
             decimal coinsVolume = 0;
             decimal recoveryPositionVolumeInMoney = CalcInitialMoneyVolume_RecoveryPosition();
@@ -412,15 +436,9 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 if (RecoveryVolumeMode.ValueString == REINVESTMENT)
                 {
-                    decimal alreadyRecoveredLossMoney = 0; // TODO : calculate
-                    recoveryPositionVolumeInMoney += alreadyRecoveredLossMoney;
+                    recoveryPositionVolumeInMoney += GainedProfitMoney;
                 }
-
-                decimal moneyNeededForFee = recoveryPositionVolumeInMoney / 100 * _bot.ComissionValue;
-                decimal moneyLeftForCoins = recoveryPositionVolumeInMoney - moneyNeededForFee;
-                decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
-                decimal volume = moneyLeftForCoins / price;
-                coinsVolume = Math.Round(volume, VolumeDecimals.ValueInt);
+                coinsVolume = ConvertMoneyToCoins(side, recoveryPositionVolumeInMoney);
             }
             return coinsVolume;
         }
@@ -446,38 +464,24 @@ namespace OsEngine.Robots.Oleg.Good
             totalDealVolumeInPercents = mainPositionVolumeInPercents + recoveryPositionVolumeInPercents;
         }
 
-        private bool IsMoneyForNewAttemptTooSmall()
+        private decimal ConvertMoneyToCoins(Side side, decimal positionVolumeInMoney)
         {
-            return GetNewAttemptMoneyNeeded() < MinVolumeUSDT.ValueDecimal;
+            decimal moneyNeededForFee = positionVolumeInMoney / 100 * _bot.ComissionValue;
+            decimal moneyLeftForCoins = positionVolumeInMoney - moneyNeededForFee;
+            decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
+            decimal volume = moneyLeftForCoins / price;
+            return Math.Round(volume, VolumeDecimals.ValueInt);
         }
 
-        private bool HasMoneyForNewAttempt()
+        private decimal CalcPositionCleanProfitMoney(Position p)
         {
-            return GetFreeMoney() > GetNewAttemptMoneyNeeded();
-        }
-
-        private decimal GetNewAttemptMoneyNeeded()
-        {
-            bool hasOpenPositionsAlready = _bot.PositionsLast != null && _bot.PositionsLast.State == PositionStateType.Open;
-            decimal moneyToCalcFrom = hasOpenPositionsAlready ? GetLastPositionEntryMoney() : _bot.Portfolio.ValueCurrent;
-            return moneyToCalcFrom * RecoveryVolumeMultiplier.ValueDecimal;
-        }
-
-        private decimal GetLastPositionEntryMoney()
-        {
-            return _bot.PositionsLast != null ? GetPositionEntryMoney(_bot.PositionsLast) : 0;
-        }
-
-        private decimal GetFreeMoney()
-        {
-            decimal freeMoney = _balanceOnStart;
-            _bot.PositionsOpenAll.ForEach(p => { freeMoney -= GetPositionEntryMoney(p); });
-            return freeMoney;
-        }
-
-        private decimal GetPositionEntryMoney(Position p)
-        {
-            return p.OpenVolume * p.EntryPrice + p.CommissionTotal();
+            decimal moneyIn = p.OpenVolume * p.EntryPrice;
+            decimal moneyOut = p.OpenVolume * p.ClosePrice;
+            decimal profitMoney = p.Direction == Side.Buy ? moneyOut - moneyIn : moneyIn - moneyOut;
+            decimal feeIn = moneyIn * _bot.ComissionValue / 100;
+            decimal feeOut = moneyOut * _bot.ComissionValue / 100;
+            decimal feeMoney = feeIn + feeOut;
+            return profitMoney - feeMoney;
         }
 
         private bool IsEnoughDataAndEnoughMoneyAndEnabledToTrade()
