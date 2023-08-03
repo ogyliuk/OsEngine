@@ -35,8 +35,6 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterString RecoveryVolumeMode;
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
-        // private StrategyParameterDecimal MinWantedProfitPercent; - TODO : think to use
-
         private StrategyParameterDecimal CleanProfitPercent;
         private StrategyParameterDecimal FirstRecoveryDistanceInSqueezes;
 
