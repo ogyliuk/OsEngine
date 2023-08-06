@@ -241,6 +241,7 @@ namespace OsEngine.Robots.Oleg.Good
                     if (IsFirstAttempt())
                     {
                         _dealDirection = Side.Buy;
+                        _bot.BuyAtStopCancel();
                         _bot.SellAtStopCancel();
                         _zoneDown = p.EntryPrice - _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
                     }                    
@@ -261,6 +262,7 @@ namespace OsEngine.Robots.Oleg.Good
                     {
                         _dealDirection = Side.Sell;
                         _bot.BuyAtStopCancel();
+                        _bot.SellAtStopCancel();
                         _zoneUp = p.EntryPrice + _squeezeSize * RiskZoneInSqueezes.ValueDecimal;
                     }
 
@@ -350,7 +352,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order_LONG()
         {
-            decimal buyCoinsVolume = GetNewAttemptCoinsVolume(Side.Buy);
+            decimal buyCoinsVolume = GetNewAttemptCoinsVolume(Side.Buy, _zoneUp);
             if (buyCoinsVolume > 0)
             {
                 _bot.BuyAtStop(buyCoinsVolume, _zoneUp, _zoneUp, StopActivateType.HigherOrEqual, 100000);
@@ -359,7 +361,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order_SHORT()
         {
-            decimal sellCoinsVolume = GetNewAttemptCoinsVolume(Side.Sell);
+            decimal sellCoinsVolume = GetNewAttemptCoinsVolume(Side.Sell, _zoneDown);
             if (sellCoinsVolume > 0)
             {
                 _bot.SellAtStop(sellCoinsVolume, _zoneDown, _zoneDown, StopActivateType.LowerOrEqyal, 100000);
@@ -392,7 +394,7 @@ namespace OsEngine.Robots.Oleg.Good
             return robotEnabled && enoughCandlesForBollinger && enoughCandlesForBollingerSqueeze;
         }
 
-        private decimal GetNewAttemptCoinsVolume(Side side)
+        private decimal GetNewAttemptCoinsVolume(Side side, decimal price)
         {
             decimal coinsVolume = 0;
             if (HasMoneyForNewAttempt() && !IsMoneyForNewAttemptTooSmall())
@@ -400,7 +402,6 @@ namespace OsEngine.Robots.Oleg.Good
                 decimal moneyAvailableForNewAttempt = GetNewAttemptMoneyNeeded();
                 decimal moneyNeededForFee = moneyAvailableForNewAttempt / 100 * _bot.ComissionValue;
                 decimal moneyLeftForCoins = moneyAvailableForNewAttempt - moneyNeededForFee;
-                decimal price = side == Side.Buy ? TabsSimple[0].PriceBestAsk : TabsSimple[0].PriceBestBid;
                 decimal volume = moneyLeftForCoins / price;
                 coinsVolume = Math.Round(volume, VolumeDecimals.ValueInt);
             }

@@ -194,7 +194,6 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void SetNewDealEntryOrders()
         {
-            // TODO : can be a problem because money not enough for both EP orders?
             Set_EN_Order_LONG(SqueezeUpBand);
             Set_EN_Order_SHORT(SqueezeDownBand);
         }
