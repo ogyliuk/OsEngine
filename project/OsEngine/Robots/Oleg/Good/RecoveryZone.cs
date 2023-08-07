@@ -439,7 +439,7 @@ namespace OsEngine.Robots.Oleg.Good
 
         private decimal GetPositionEntryMoney(Position p)
         {
-            return p.OpenVolume * p.EntryPrice + p.CommissionTotal();
+            return p.MaxVolume * p.EntryPrice + p.CommissionTotal();
         }
 
         private static void LogPositionResults(Position p)

@@ -1850,11 +1850,14 @@ namespace OsEngine.Charts.CandleChart
                         if (deals[i].Direction == Side.Sell)
                         {
                             lineSeries.Color = Color.Green;
+                            lineSeries.Label = "SHORT SL";
                         }
                         else
                         {
                             lineSeries.Color = Color.Red;
+                            lineSeries.Label = "LONG SL";
                         }
+                        lineSeries.LabelForeColor = lineSeries.Color;
 
                         if (stopProfitOrderSeries == null)
                         {
@@ -1895,11 +1898,14 @@ namespace OsEngine.Charts.CandleChart
                         if (deals[i].Direction == Side.Sell)
                         {
                             lineSeries.Color = Color.Green;
+                            lineSeries.Label = "SHORT TP";
                         }
                         else
                         {
                             lineSeries.Color = Color.Red;
+                            lineSeries.Label = "LONG TP";
                         }
+                        lineSeries.LabelForeColor = lineSeries.Color;
 
                         if (stopProfitOrderSeries == null)
                         {

@@ -1,11 +1,14 @@
-﻿using OsEngine.Charts.CandleChart.Indicators;
+﻿using OsEngine.Charts.CandleChart.Elements;
+using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Entity;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.OsTrader.Panels.Tab;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
+using System.Threading;
 
 namespace OsEngine.Robots.Oleg.Good
 {
@@ -14,14 +17,27 @@ namespace OsEngine.Robots.Oleg.Good
     {
         private static readonly String STATIC = "Static";
         private static readonly String REINVESTMENT = "Reinvestment";
+        private static readonly String REINVESTMENT_SWAP = "Reinvestment+Swap";
+        private static readonly String TRAILING = "Trailing";
+
+        #region STATS
+        private Situation _situation;
+        private int _swapesCounter;
+        private int _recoveriesCounter;
+        #endregion
 
         private BotTabSimple _bot;
         private string _dealGuid;
-        private decimal _squeezeSize;
-        private decimal _balanceOnStart;
-        private decimal _availableMoney;
+        private decimal _lastUsedSqueezeUpBand;
+        private decimal _lastUsedSqueezeDownBand;
+        private decimal _balanceMoneyOnDealStart;
+        private decimal _nonLockedMoneyAmount;
         private Position _mainPosition;
         private Position _recoveryPosition;
+        private List<Position> _dealPositions;
+
+        private LineHorisontal _longEntryLine;
+        private LineHorisontal _shortEntryLine;
 
         private BollingerWithSqueeze _bollingerWithSqueeze;
 
@@ -34,28 +50,54 @@ namespace OsEngine.Robots.Oleg.Good
         private StrategyParameterDecimal RecoveryVolumeMultiplier;
         private StrategyParameterInt VolumeDecimals;
         private StrategyParameterDecimal MinVolumeUSDT;
-        private StrategyParameterDecimal WantedCleanProfitPercent;
+        private StrategyParameterDecimal MinWantedCleanProfitPercent;
         private StrategyParameterDecimal StartRecoveryDistanceInSqueezes;
+        private StrategyParameterString TakeProfitMode;
 
+        private decimal MAX_PRICE { get { return 1000000m; } }
+        private decimal MIN_PRICE { get { return _bot.Securiti.PriceStep; } }
         private bool MainPositionExists { get { return _mainPosition != null; } }
         private bool RecoveryPositionExists { get { return _recoveryPosition != null; } }
         private bool HasEntryOrdersSet { get { return _bot.PositionOpenerToStopsAll.Count > 0; } }
-        private decimal SqueezeUpBand { get { return _bollingerWithSqueeze.ValuesUp.Last(); } }
-        private decimal SqueezeDownBand { get { return _bollingerWithSqueeze.ValuesDown.Last(); } }
+        private decimal LastUsedSqueezeSize
+        {
+            get
+            {
+                decimal squeezeSize = _lastUsedSqueezeUpBand - _lastUsedSqueezeDownBand;
+                return squeezeSize > 0 ? squeezeSize : 0;
+            }
+        }
+        private decimal ClosedPosesCleanProfitMoneySum
+        {
+            get
+            {
+                return _dealPositions
+                    .Where(p => p.State == PositionStateType.Done)
+                    .Select(p => CalcPositionCleanProfitMoney(p))
+                    .Sum();
+            }
+        }
 
         public MovingRecoveryZone(string name, StartProgram startProgram) : base(name, startProgram)
         {
             TabCreate(BotTabType.Simple);
             _bot = TabsSimple[0];
             _dealGuid = String.Empty;
+            _situation = Situation.NONE;
+            _swapesCounter = 0;
+            _recoveriesCounter = 0;
+            _dealPositions = new List<Position>();
+            _longEntryLine = null;
+            _shortEntryLine = null;
 
-            Regime = CreateParameter("Regime", "Off", new[] { "Off", "On" }, "Base");
+            Regime = CreateParameter("Regime", "Off", new[] { "Off", "On", "OnlyLong", "OnlyShort" }, "Base");
             VolumeDecimals = CreateParameter("Decimals in VOLUME", 0, 0, 4, 1, "Base");
             MinVolumeUSDT = CreateParameter("Min VOLUME USDT", 7m, 7m, 7m, 1m, "Base");
-            RecoveryVolumeMode = CreateParameter("Recovery VOLUME MODE", STATIC, new[] { STATIC, REINVESTMENT }, "Base");
+            RecoveryVolumeMode = CreateParameter("Recovery VOLUME MODE", REINVESTMENT, new[] { REINVESTMENT, REINVESTMENT_SWAP, STATIC }, "Base");
             RecoveryVolumeMultiplier = CreateParameter("Recovery VOLUME MULTIPLIER", 0.8m, 0.8m, 0.9m, 0.05m, "Base");
             StartRecoveryDistanceInSqueezes = CreateParameter("Start recovery DISTANCE in SQUEEZEs", 2m, 2m, 10, 0.1m, "Base");
-            WantedCleanProfitPercent = CreateParameter("Wanted CLEAN PROFIT %", 0.1m, 0.1m, 1, 0.1m, "Base");
+            MinWantedCleanProfitPercent = CreateParameter("Min wanted CLEAN PROFIT %", 0.1m, 0.1m, 1, 0.1m, "Base");
+            TakeProfitMode = CreateParameter("Take profit MODE", STATIC, new[] { STATIC, TRAILING }, "Base");
 
             BollingerLength = CreateParameter("BOLLINGER - Length", 20, 20, 50, 2, "Robot parameters");
             BollingerDeviation = CreateParameter("BOLLINGER - Deviation", 2m, 2m, 3m, 0.1m, "Robot parameters");
@@ -74,6 +116,7 @@ namespace OsEngine.Robots.Oleg.Good
 
             this.ParametrsChangeByUser += event_ParametersChangedByUser;
             event_ParametersChangedByUser();
+            OlegUtils.LogSeparationLine();
         }
 
         public override string GetNameStrategyType()
@@ -99,56 +142,75 @@ namespace OsEngine.Robots.Oleg.Good
             bool volumeMultiplierValid = RecoveryVolumeMultiplier.ValueDecimal > 0 && RecoveryVolumeMultiplier.ValueDecimal < 1;
             if (!volumeMultiplierValid)
             {
-                throw new Exception("Volume multiplier value is INVALID! It must be > 0 and < 1");
+                ThrowException("Volume multiplier value is INVALID! It must be > 0 and < 1");
             }
         }
 
         private void event_CandleClosed_SQUEEZE_FOUND(List<Candle> candles)
         {
-            if (IsEnoughDataAndEnoughMoneyAndEnabledToTrade())
-            {
-                bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
-                if (lastCandleHasSqueeze)
-                {
-                    bool noDeal = !MainPositionExists && !RecoveryPositionExists && !HasEntryOrdersSet;
-                    if (noDeal)
-                    {
-                        InitNewDealParameters();
-                        SetNewDealEntryOrders();
-                    }
+            RefreshEntryLinesOnChart(candles);
 
-                    bool recoveringDeal = MainPositionExists && RecoveryPositionExists;
-                    if (recoveringDeal)
-                    {
-                        bool betterSqueezeFound = MoveRecoveryTrailing_SL_IfPossible();
-                        if (betterSqueezeFound)
-                        {
-                            _squeezeSize = SqueezeUpBand - SqueezeDownBand;
-                        }
-                    }
-                }
+            if (IsEnoughDataAndEnabledToTrade())
+            {
+                CancelNewDealEntryOrderIfSqueezeLost(candles.Last());
+                HandleNewSqueeze();
             }
         }
 
         private void event_PositionOpened_SET_ORDERS(Position p)
         {
-            if (p != null && p.State == PositionStateType.Open)
+            if (p != null && !_dealPositions.Contains(p) && p.State == PositionStateType.Open)
             {
-                LockMoneySpentForPosition(p);
+                _dealPositions.Add(p);
+
+                Cancel_EP_Orders();
                 RecognizeAndSetupPosition(p);
-                SwapPositionsIfNeeded();
+                LockMoneySpentForPosition(p);
+                bool swapped = SwapPositionsIfNeeded();
 
                 if (MainPositionExists)
                 {
                     if (RecoveryPositionExists)
                     {
+                        _situation = Situation.TWO_POSES_ON_BE;
+                        Cancel_TP_and_SL_Orders();
                         SetBothPositionsTo_BE_PriceExit();
+                        if (swapped)
+                        {
+                            // After swap distance between both poses can be very big and in case of move
+                            // into recovery direction we won't be doing any recoveries for a long time.
+                            // That's why we decide to exit rec pos by TP with LOSS = GAINED_PROFIT to have
+                            // ability enter new rec pos closer to a main pos and keep recovering again.
+                            decimal BE_price = Calc_BE_Price();
+                            if (IsPriceUreachable(BE_price))
+                            {
+                                // This order will always eb executed before any possible move of REC SL
+                                // to new profitable squeeze beceause this TP is always stay closer to current price
+                                // Potential profitable squeeze is far from this point because we ignore all 
+                                // new squeezes which are non profitable against of REC pos EP, but this TP
+                                // order is not profitable, that's why it will be triggered first
+                                decimal availableAlreadyRecoveredCleanProfitMoney = ClosedPosesCleanProfitMoneySum;
+                                if (availableAlreadyRecoveredCleanProfitMoney > 0)
+                                {
+                                    SetRecoveryPosition_TP_Order_FinishWithLossEqualToExistingRecoveredProfit();
+                                }
+                                else
+                                {
+                                    // Do nothing because if we came into swap with no recovered profit,
+                                    // that means that we did swap immediately after previous swap. In such
+                                    // case recovery zone is small and there is no sense to exit recovery
+                                    // position at the point of entry (with 0 profit). Better to let price
+                                    // go and probably reach some squeeze behind the recovery position EP to
+                                    // exit and recover some profit
+                                }
+                            }
+                        }
                     }
                     else
                     {
-                        CancelOpposite_EP_Order();
-                        SetMainPosition_TP_Order_Initial();
-                        SetRecoveryPosition_EP_Order(_mainPosition.EntryPrice);
+                        _situation = Situation.FIRST_TRY;
+                        SetMainPosition_TP_Order_InitialIfNeeded();
+                        SetRecoveryPosition_EP_Order(_lastUsedSqueezeUpBand, _lastUsedSqueezeDownBand);
                     }
                 }
             }
@@ -171,10 +233,21 @@ namespace OsEngine.Robots.Oleg.Good
 
                 if (IsRecoveryPosition(p))
                 {
+                    _recoveriesCounter++;
                     if (MainPositionExists)
                     {
-                        SetMainPosition_TP_Order_ToFullLossRecovery();
-                        SetRecoveryPosition_EP_Order(_recoveryPosition.ClosePrice);
+                        bool recPosClosedBySL = PositionClosedBySL(p);
+                        bool recPos_SL_StayOn_BE_PriceWithMainPos_TP = p.StopOrderRedLine == _mainPosition.ProfitOrderRedLine && !IsPriceUreachable(p.StopOrderRedLine);
+                        bool mainPositionClosingNowToo = recPos_SL_StayOn_BE_PriceWithMainPos_TP && recPosClosedBySL;
+                        if (!mainPositionClosingNowToo)
+                        {
+                            _situation = Situation.MAIN_POS_ON_BE;
+                            SetMainPosition_TP_Order_ToFullLossRecovery();
+                            if (recPosClosedBySL)
+                            {
+                                SetRecoveryPosition_EP_Order(_lastUsedSqueezeUpBand, _lastUsedSqueezeDownBand);
+                            }
+                        }
                     }
                     else
                     {
@@ -187,49 +260,206 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void InitNewDealParameters()
         {
-            _balanceOnStart = _bot.Portfolio.ValueCurrent;
-            _availableMoney = _bot.Portfolio.ValueCurrent;
-            _squeezeSize = SqueezeUpBand - SqueezeDownBand;
+            _balanceMoneyOnDealStart = _bot.Portfolio.ValueCurrent;
+            _nonLockedMoneyAmount = _bot.Portfolio.ValueCurrent;
         }
 
-        private void SetNewDealEntryOrders()
+        private void SetNewDealEntryOrders(decimal squeezeUpBand, decimal squeezeDownBand)
         {
-            Set_EN_Order_LONG(SqueezeUpBand);
-            Set_EN_Order_SHORT(SqueezeDownBand);
+            if (Regime.ValueString == "On" || Regime.ValueString == "OnlyLong")
+            {
+                Set_EN_Order_LONG(squeezeUpBand);
+            }
+            if (Regime.ValueString == "On" || Regime.ValueString == "OnlyShort")
+            {
+                Set_EN_Order_SHORT(squeezeDownBand);
+            }
+        }
+
+        private void CancelNewDealEntryOrderIfSqueezeLost(Candle closedCandle)
+        {
+            bool aboutToEnterNewDeal = !MainPositionExists && !RecoveryPositionExists && HasEntryOrdersSet;
+            if (aboutToEnterNewDeal)
+            {
+                bool longOnlyMode = Regime.ValueString == "OnlyLong";
+                bool shortOnlyMode = Regime.ValueString == "OnlyShort";
+                bool priceWentOutFromSqueezeToShort = closedCandle.Low < _lastUsedSqueezeDownBand;
+                bool priceWentOutFromSqueezeToLong = closedCandle.High > _lastUsedSqueezeUpBand;
+                if ((longOnlyMode && priceWentOutFromSqueezeToShort) || (shortOnlyMode && priceWentOutFromSqueezeToLong))
+                {
+                    Cancel_EP_Orders();
+                }
+            }
+        }
+
+        private void HandleNewSqueeze()
+        {
+            bool lastCandleHasSqueeze = _bollingerWithSqueeze.ValuesSqueezeFlag.Last() > 0;
+            if (lastCandleHasSqueeze)
+            {
+                bool squeezeWasUseful = false;
+                decimal squeezeUpBand = _bollingerWithSqueeze.ValuesUp.Last();
+                decimal squeezeDownBand = _bollingerWithSqueeze.ValuesDown.Last();
+
+                bool noDeal = !MainPositionExists && !RecoveryPositionExists && !HasEntryOrdersSet;
+                if (noDeal && HasEnoughMoneyToTrade())
+                {
+                    squeezeWasUseful = true;
+                    InitNewDealParameters();
+                    SetNewDealEntryOrders(squeezeUpBand, squeezeDownBand);
+                }
+
+                bool noRecoveryYet = MainPositionExists && !RecoveryPositionExists && GetLastClosedRecoveryPosition() == null;
+                if (noRecoveryYet)
+                {
+                    MoveOrSetMainTrailing_SL_WhenMoreProfitableSqueezeFound(squeezeUpBand, squeezeDownBand);
+                }
+
+                bool recoveringDeal = MainPositionExists && RecoveryPositionExists;
+                if (recoveringDeal)
+                {
+                    squeezeWasUseful = MoveRecoveryTrailing_SL_WhenMoreProfitableSqueezeFound(squeezeUpBand, squeezeDownBand);
+                }
+
+                bool alreadyClosedSomeRecoveries = GetLastClosedRecoveryPosition() != null;
+                bool mainDealAfterClosedRecovery = MainPositionExists && !RecoveryPositionExists && alreadyClosedSomeRecoveries;
+                if (mainDealAfterClosedRecovery)
+                {
+                    squeezeWasUseful = MoveRecoveryTrailing_EP_WhenMoreBeneficialSqueezeFound(squeezeUpBand, squeezeDownBand);
+                }
+
+                if (squeezeWasUseful)
+                {
+                    _lastUsedSqueezeUpBand = squeezeUpBand;
+                    _lastUsedSqueezeDownBand = squeezeDownBand;
+                }
+            }
         }
 
         private void FinishDeal()
         {
+            int days = (_dealPositions.Last().TimeClose - _dealPositions.First().TimeOpen).Days;
+            OlegUtils.Log("DAYS = {0}", days == 0 ? 1 : days);
+
+            // BREAK-POINT CONDITION : _dealPositions[0].Direction == Side.Sell && _situation == Situation.MAIN_POS_ON_BE && _recoveriesCounter == 1 && _swapesCounter == 0
             if (HasEntryOrdersSet)
             {
-                _bot.BuyAtStopCancel();
-                _bot.SellAtStopCancel();
+                Cancel_EP_Orders();
             }
             _dealGuid = String.Empty;
+            _situation = Situation.NONE;
+            _swapesCounter = 0;
+            _recoveriesCounter = 0;
+            _dealPositions = new List<Position>();
+        }
+
+        private bool HasEnoughMoneyToTrade()
+        {
+            return _bot.Portfolio.ValueCurrent >= MinVolumeUSDT.ValueDecimal;
         }
 
         private void LockMoneySpentForPosition(Position p)
         {
-            _availableMoney -= ConvertCoinsToMoney(p.OpenVolume, p.EntryPrice);
+            decimal nonLockedMoneyAmountBefore = _nonLockedMoneyAmount;
+            decimal moneyIn = ConvertEntryCoinsToMoney(p.MaxVolume, p.EntryPrice);
+            _nonLockedMoneyAmount -= moneyIn;
+            OlegUtils.Log("HOLD {0} {1}: Deal={2}; {3} - {4}[{5}] = {6}; EntryPrice = {7}, PosID = {8}, Date = {9}",
+                IsMainPosition(p) ? "MAIN" : "REC", p.Direction == Side.Buy ? "(long)" : "(short)", 
+                _dealGuid.Substring(0, 8), TruncateMoney(nonLockedMoneyAmountBefore), TruncateMoney(moneyIn), 
+                p.MaxVolume, TruncateMoney(_nonLockedMoneyAmount), p.EntryPrice, p.Number, p.TimeOpen);
         }
 
         private void UnlockMoneyReleasedByPosition(Position p)
         {
-            _availableMoney += CalcPositionCleanProfitMoney(p);
+            decimal nonLockedMoneyAmountBefore = _nonLockedMoneyAmount;
+            decimal entryMoney = ConvertEntryCoinsToMoney(p.MaxVolume, p.EntryPrice);
+            decimal cleanProfitMoney = CalcPositionCleanProfitMoney(p);
+            decimal moneyOut = entryMoney + cleanProfitMoney;
+            _nonLockedMoneyAmount += moneyOut;
+            OlegUtils.Log("FREE {0} : Deal={1}; {2} + {3} = {4}; ClosePrice = {5}, Profit = {6}, DealBalance = {7}, PosID = {8}, Date = {9}",
+                IsMainPosition(p) ? "MAIN" : "REC", _dealGuid.Substring(0, 8), TruncateMoney(nonLockedMoneyAmountBefore),
+                TruncateMoney(moneyOut), TruncateMoney(_nonLockedMoneyAmount), p.ClosePrice,
+                TruncateMoney(cleanProfitMoney), TruncateMoney(GetCurrentDealBalance()), p.Number, p.TimeClose);
         }
 
-        private bool MoveRecoveryTrailing_SL_IfPossible()
+        private void MoveOrSetMainTrailing_SL_WhenMoreProfitableSqueezeFound(decimal newSqueezeUpBand, decimal newSqueezeDownBand)
+        {
+            if (TakeProfitMode.ValueString == TRAILING)
+            {
+                bool mainIsLong = _mainPosition.Direction == Side.Buy;
+                decimal curTrailing_SL_Price = _mainPosition.StopOrderRedLine;
+                decimal newTrailing_SL_Price = mainIsLong ? newSqueezeDownBand : newSqueezeUpBand;
+
+                bool new_SL_PriceIsFarEnough = CalcPositionCleanProfitMoney(_mainPosition, newTrailing_SL_Price) > CalcMainPositionMinWantedProfitInMoney();
+                if (new_SL_PriceIsFarEnough)
+                {
+                    bool canShiftExistingTrailing_SL_ToBetterPlace = false;
+                    bool alreadyHaveTrailing_SL_Set = _mainPosition.StopOrderIsActiv;
+                    if (alreadyHaveTrailing_SL_Set)
+                    {
+                        canShiftExistingTrailing_SL_ToBetterPlace = mainIsLong ?
+                            newTrailing_SL_Price > curTrailing_SL_Price :
+                            newTrailing_SL_Price < curTrailing_SL_Price;
+                    }
+
+                    bool needToSetNewTrailing_SL_Price = !alreadyHaveTrailing_SL_Set || canShiftExistingTrailing_SL_ToBetterPlace;
+                    if (needToSetNewTrailing_SL_Price)
+                    {
+                        Set_SL_Order(_mainPosition, newTrailing_SL_Price);
+                    }
+                }
+            }
+        }
+
+        private bool MoveRecoveryTrailing_SL_WhenMoreProfitableSqueezeFound(decimal newSqueezeUpBand, decimal newSqueezeDownBand)
         {
             bool recoveryIsLong = _recoveryPosition.Direction == Side.Buy;
-            decimal cur_SL_Price = _recoveryPosition.StopOrderPrice;
-            decimal new_SL_Price = recoveryIsLong ? SqueezeDownBand : SqueezeUpBand;
+            decimal cur_TP_Price = _recoveryPosition.ProfitOrderRedLine;
+            decimal cur_SL_Price = _recoveryPosition.StopOrderRedLine;
+            decimal new_SL_Price = recoveryIsLong ? newSqueezeDownBand : newSqueezeUpBand;
             bool canShiftToBetterPlace = recoveryIsLong ? new_SL_Price > cur_SL_Price : new_SL_Price < cur_SL_Price;
             if (canShiftToBetterPlace)
             {
+                bool new_SL_InConflictWithExisting_TP = 
+                    _recoveryPosition.ProfitOrderIsActiv && 
+                    (recoveryIsLong ? new_SL_Price > cur_TP_Price : new_SL_Price < cur_TP_Price);
+                if (new_SL_InConflictWithExisting_TP)
+                {
+                    ThrowException("Can't set for RECOVERY position SL = {0} when have TP = {1}", new_SL_Price, cur_TP_Price);
+                }
+
                 decimal potentialRecoveryCleanProfit = CalcPositionCleanProfitMoney(_recoveryPosition, new_SL_Price);
                 if (potentialRecoveryCleanProfit > 0)
                 {
                     Set_SL_Order(_recoveryPosition, new_SL_Price);
+                    _situation = Situation.TWO_POSES_REC_ON_SHIFTED_EXIT;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool MoveRecoveryTrailing_EP_WhenMoreBeneficialSqueezeFound(decimal newSqueezeUpBand, decimal newSqueezeDownBand)
+        {
+            bool recoveryIsLong = _mainPosition.Direction == Side.Sell;
+            decimal cur_EP_Price = _bot.PositionOpenerToStopsAll
+                .Where(p => p.Side == (recoveryIsLong ? Side.Buy : Side.Sell))
+                .Select(p => p.PriceRedLine)
+                .FirstOrDefault();
+
+            bool noRecoveryEntryOrderSet = cur_EP_Price == 0;
+            cur_EP_Price = noRecoveryEntryOrderSet ? (recoveryIsLong ? MAX_PRICE : MIN_PRICE) : cur_EP_Price;
+
+            decimal new_EP_Price = Calc_EP_Price_RecoveryPosition(recoveryIsLong, newSqueezeUpBand, newSqueezeDownBand);
+            bool canShiftToBetterPlace = recoveryIsLong ? new_EP_Price < cur_EP_Price : new_EP_Price > cur_EP_Price;
+            if (canShiftToBetterPlace)
+            {
+                bool new_EP_reachedMainPosition_EP_Level = recoveryIsLong ? new_EP_Price < _mainPosition.EntryPrice : new_EP_Price > _mainPosition.EntryPrice;
+                if (!new_EP_reachedMainPosition_EP_Level)
+                {
+                    Cancel_EP_Orders();
+                    SetRecoveryPosition_EP_Order(newSqueezeUpBand, newSqueezeDownBand);
+                    _situation = Situation.MAIN_POS_ON_BE_AND_REC_ON_SHIFTED_ENTRY;
                     return true;
                 }
             }
@@ -253,6 +483,7 @@ namespace OsEngine.Robots.Oleg.Good
             {
                 _mainPosition = p;
                 _dealGuid = Guid.NewGuid().ToString();
+                OlegUtils.Log("New Deal time OPEN = {0}", p.TimeOpen);
             }
             else
             {
@@ -261,61 +492,182 @@ namespace OsEngine.Robots.Oleg.Good
             p.DealGuid = _dealGuid;
         }
 
-        private void SwapPositionsIfNeeded()
+        private bool SwapPositionsIfNeeded()
         {
-            if (MainPositionExists && RecoveryPositionExists)
+            bool swapped = false;
+
+            bool swappingEnabled = RecoveryVolumeMode.ValueString == REINVESTMENT_SWAP;
+            if (swappingEnabled && MainPositionExists && RecoveryPositionExists)
             {
-                bool recoveryPositionLarger = _mainPosition.OpenVolume < _recoveryPosition.OpenVolume;
-                if (recoveryPositionLarger)
+                bool swapRequired = false;
+                if (_mainPosition.Direction == Side.Sell)
+                {
+                    decimal mainPositionEntryMoney = ConvertEntryCoinsToMoney(_mainPosition.MaxVolume, _mainPosition.EntryPrice);
+                    decimal recoveryPositionEntryMoney = ConvertEntryCoinsToMoney(_recoveryPosition.MaxVolume, _recoveryPosition.EntryPrice);
+                    bool recoveryPositionLargerByMoney = recoveryPositionEntryMoney > mainPositionEntryMoney;
+                    swapRequired = recoveryPositionLargerByMoney;
+                }
+                else
+                {
+                    decimal mainPositionEntryCoins = _mainPosition.MaxVolume;
+                    decimal recoveryPositionEntryCoins = _recoveryPosition.MaxVolume;
+                    bool recoveryPositionLargerByCoins = recoveryPositionEntryCoins > mainPositionEntryCoins;
+                    swapRequired = recoveryPositionLargerByCoins;
+                }
+
+                // TODO : investigate and uncomment
+                // ***************************************************
+                // decimal afterSwap_BE_Price = Calc_BE_PriceIfSwapped();
+                // swapRequired = !IsPriceUreachable(afterSwap_BE_Price);
+                // ***************************************************
+
+                if (swapRequired)
                 {
                     Position bufferPosition = _mainPosition;
                     _mainPosition = _recoveryPosition;
                     _recoveryPosition = bufferPosition;
+                    _swapesCounter++;
+                    OlegUtils.Log("Swap! Main is {0} now, PosID = {1}!", 
+                        _mainPosition.Direction == Side.Buy ? "LONG" : "SHORT", _mainPosition.Number);
+                    swapped = true;
                 }
             }
+
+            return swapped;
         }
 
-        private void CancelOpposite_EP_Order()
+        private void Cancel_EP_Orders()
+        {
+            _bot.BuyAtStopCancel();
+            _bot.SellAtStopCancel();
+            DeleteEntryLinesFromChart();
+        }
+
+        private void Cancel_TP_and_SL_Orders()
         {
             if (_mainPosition != null)
             {
-                _bot.SellAtStopCancel();
-                _bot.BuyAtStopCancel();
+                _mainPosition.StopOrderIsActiv = false;
+                _mainPosition.ProfitOrderIsActiv = false;
+            }
+            if (_recoveryPosition != null)
+            {
+                _recoveryPosition.StopOrderIsActiv = false;
+                _recoveryPosition.ProfitOrderIsActiv = false;
             }
         }
 
-        private void SetMainPosition_TP_Order_Initial()
+        private LineHorisontal CreateEntryLineOnChart_LONG(decimal entryPrice)
         {
-            decimal moneyIn = CalcInitialMoneyVolume_MainPosition();
-            decimal wantedCleanProfitMoney = moneyIn * WantedCleanProfitPercent.ValueDecimal / 100;
-            decimal TP_price = _mainPosition.Direction == Side.Buy ?
-                Calc_TP_Price_LONG_TakeWantedCleanProfit_MONEY(_mainPosition, wantedCleanProfitMoney) :
-                Calc_TP_Price_SHORT_TakeWantedCleanProfit_MONEY(_mainPosition, wantedCleanProfitMoney);
-            Set_TP_Order(_mainPosition, TP_price);
+            return CreateLineOnChart("LONG entry line", "LONG entry", entryPrice);
+        }
+
+        private LineHorisontal CreateEntryLineOnChart_SHORT(decimal entryPrice)
+        {
+            return CreateLineOnChart("SHORT entry line", "SHORT entry", entryPrice);
+        }
+
+        private LineHorisontal CreateLineOnChart(string lineName, string lineLabel, decimal linePriceLevel)
+        {
+            LineHorisontal line = new LineHorisontal(lineName, "Prime", false);
+            line.Value = linePriceLevel;
+            line.TimeStart = _bot.CandlesAll[0].TimeStart;
+            line.TimeEnd = _bot.CandlesAll[_bot.CandlesAll.Count - 1].TimeStart;
+            line.Color = Color.White;
+            line.Label = lineLabel;
+            _bot.SetChartElement(line);
+            return line;
+        }
+
+        private void DeleteEntryLinesFromChart()
+        {
+            if (_longEntryLine != null)
+            {
+                _bot.DeleteChartElement(_longEntryLine);
+                _longEntryLine = null;
+            }
+            if (_shortEntryLine != null)
+            {
+                _bot.DeleteChartElement(_shortEntryLine);
+                _shortEntryLine = null;
+            }
+        }
+
+        private void RefreshEntryLinesOnChart(List<Candle> candles)
+        {
+            if (_longEntryLine != null)
+            {
+                _longEntryLine.TimeEnd = candles[candles.Count - 1].TimeStart;
+                _longEntryLine.Refresh();
+            }
+            if (_shortEntryLine != null)
+            {
+                _shortEntryLine.TimeEnd = candles[candles.Count - 1].TimeStart;
+                _shortEntryLine.Refresh();
+            }
+        }
+
+        private void SetMainPosition_TP_Order_InitialIfNeeded()
+        {
+            if (TakeProfitMode.ValueString == STATIC)
+            {
+                decimal minWantedCleanProfitMoney = CalcMainPositionMinWantedProfitInMoney();
+                decimal TP_price = _mainPosition.Direction == Side.Buy ?
+                    Calc_EXIT_Price_LONG_TakeWantedCleanProfit_MONEY(_mainPosition, minWantedCleanProfitMoney) :
+                    Calc_EXIT_Price_SHORT_TakeWantedCleanProfit_MONEY(_mainPosition, minWantedCleanProfitMoney);
+                Set_TP_Order(_mainPosition, TP_price);
+            }
         }
 
         private void SetMainPosition_TP_Order_ToFullLossRecovery()
         {
-            Set_TP_Order(_mainPosition, Calc_TP_Price_MainPosition_FinishDealOnBreakEven());
+            decimal fullLossRecovery_TP_Price = Calc_EXIT_Price_FinishWithLossEqualToExistingRecoveredProfit(_mainPosition);
+            OlegUtils.Log("NO LOSS main TP = {0}, CurPrice = {1}, PosID = {2}", 
+                TruncatePrice(fullLossRecovery_TP_Price), TruncatePrice(GetCurrentPrice()), _mainPosition.Number);
+            Set_TP_Order(_mainPosition, fullLossRecovery_TP_Price);
         }
 
-        private void SetRecoveryPosition_EP_Order(decimal squeezeOppositeBandPriceRecentlyUsed)
+        private void SetRecoveryPosition_TP_Order_FinishWithLossEqualToExistingRecoveredProfit()
         {
-            if (_mainPosition.Direction == Side.Buy)
+            decimal lossEqualToExistingRecoveredProfit_TP_Price = Calc_EXIT_Price_FinishWithLossEqualToExistingRecoveredProfit(_recoveryPosition);
+            OlegUtils.Log("CONSUME EXISTING PROFIT recovery TP = {0}, ExistingProfit = {1}, PosID = {2}", 
+                TruncatePrice(lossEqualToExistingRecoveredProfit_TP_Price), TruncateMoney(ClosedPosesCleanProfitMoneySum), _recoveryPosition.Number);
+            Set_TP_Order(_recoveryPosition, lossEqualToExistingRecoveredProfit_TP_Price);
+        }
+
+        private void SetRecoveryPosition_EP_Order(decimal squeezeUpBand, decimal squeezeDownBand)
+        {
+            bool recoveryIsLong = _mainPosition.Direction == Side.Sell;
+            decimal recoveryPosition_EP_Price = Calc_EP_Price_RecoveryPosition(recoveryIsLong, squeezeUpBand, squeezeDownBand);
+            if (recoveryIsLong)
             {
-                Set_EN_Order_SHORT(Calc_EP_Price_ForRecovery_MAIN_is_LONG(squeezeOppositeBandPriceRecentlyUsed));
+                Set_EN_Order_LONG(recoveryPosition_EP_Price);
             }
-            else if (_mainPosition.Direction == Side.Sell)
+            else
             {
-                Set_EN_Order_LONG(Calc_EP_Price_ForRecovery_MAIN_is_SHORT(squeezeOppositeBandPriceRecentlyUsed));
+                Set_EN_Order_SHORT(recoveryPosition_EP_Price);
             }
         }
 
         private void SetBothPositionsTo_BE_PriceExit()
         {
-            decimal BE_price = Calc_BE_Price();
-            Set_TP_Order(_mainPosition, BE_price);
+            // PROBLEM: When we move to a point where BE price is unreachable
+            // it means that if price will strongly move into main pos direction,
+            // then we will stuck as no recoveries will happen
+            // 
+            // SOLUTION:
+            // a) we can let rec pos to exit by SL at the point where it will provide loss = gained_profit
+            // That will allow to keep moving into main pos direction to finish or start recovering
+            // again closer to the price
+            // b) we can try to decrease rec pos volume until BE price won't be unreachable and
+            // enter recovery using this volume 
+            // 
+            // We can do (a) if we have some recovered profit and start doing (b) when there is no profit
+            // or we can do only (b) always and get rid of the (a) logic to never lose the profit
+            //
+            decimal BE_price = Calc_BE_Price(loggingEnabled: true);
             Set_SL_Order(_recoveryPosition, BE_price);
+            Set_TP_Order(_mainPosition, BE_price);
         }
 
         private void Set_TP_Order(Position p, decimal TP_price)
@@ -340,94 +692,189 @@ namespace OsEngine.Robots.Oleg.Good
 
         private void Set_EN_Order(decimal entryPrice, Side side)
         {
-            decimal coinsVolume = MainPositionExists ? 
-                CalcCoinsVolume_RecoveryPosition(side, entryPrice) : 
-                CalcCoinsVolume_MainPosition(side, entryPrice);
+            decimal coinsVolume = MainPositionExists ? CalcCoinsVolume_RecoveryPosition(entryPrice) : CalcCoinsVolume_MainPosition(entryPrice);
             if (coinsVolume > 0)
             {
                 if (side == Side.Buy)
                 {
                     _bot.BuyAtStop(coinsVolume, entryPrice, entryPrice, StopActivateType.HigherOrEqual, 100000);
+                    _longEntryLine = CreateEntryLineOnChart_LONG(entryPrice);
                 }
                 else
                 {
                     _bot.SellAtStop(coinsVolume, entryPrice, entryPrice, StopActivateType.LowerOrEqyal, 100000);
+                    _shortEntryLine = CreateEntryLineOnChart_SHORT(entryPrice);
                 }
             }
         }
 
-        private decimal Calc_TP_Price_MainPosition_FinishDealOnBreakEven()
+        private decimal Calc_EP_Price_RecoveryPosition(bool recoveryIsLong, decimal squeezeUpBand, decimal squeezeDownBand)
         {
-            decimal wantedCleanProfitMoney = 0 - _availableMoney;
-            return _mainPosition.Direction == Side.Buy ? 
-                Calc_TP_Price_LONG_TakeWantedCleanProfit_MONEY(_mainPosition, wantedCleanProfitMoney) : 
-                Calc_TP_Price_SHORT_TakeWantedCleanProfit_MONEY(_mainPosition, wantedCleanProfitMoney);
+            decimal distance = StartRecoveryDistanceInSqueezes.ValueDecimal;
+            decimal EP_Price = recoveryIsLong ?
+                squeezeDownBand + LastUsedSqueezeSize * distance :
+                squeezeUpBand - LastUsedSqueezeSize * distance;
+            return NormalizePrice(EP_Price);
         }
 
-        private decimal Calc_TP_Price_LONG_TakeWantedCleanProfit_MONEY(Position p, decimal wantedCleanProfitMoney)
+        private decimal Calc_EXIT_Price_FinishWithLossEqualToExistingRecoveredProfit(Position p)
         {
+            decimal availableAlreadyRecoveredCleanProfitMoney = ClosedPosesCleanProfitMoneySum;
+            decimal wantedCleanProfitMoney = availableAlreadyRecoveredCleanProfitMoney <= 0 ? 
+                0 : -availableAlreadyRecoveredCleanProfitMoney;
+            return p.Direction == Side.Buy ? 
+                Calc_EXIT_Price_LONG_TakeWantedCleanProfit_MONEY(p, wantedCleanProfitMoney) : 
+                Calc_EXIT_Price_SHORT_TakeWantedCleanProfit_MONEY(p, wantedCleanProfitMoney);
+        }
+
+        private decimal Calc_EXIT_Price_LONG_TakeWantedCleanProfit_MONEY(Position p, decimal wantedCleanProfitMoney)
+        {
+            // Profit will be a bit SMALLER than expected because of price rouding to SMALLER size
             decimal feeInPercents = _bot.ComissionValue;
-            return (p.OpenVolume * p.EntryPrice * (100 + feeInPercents) + 100 * wantedCleanProfitMoney) / (p.OpenVolume * (100 - feeInPercents));
+            decimal exitPrice = (p.MaxVolume * p.EntryPrice * (100 + feeInPercents) + 100 * wantedCleanProfitMoney) / (p.MaxVolume * (100 - feeInPercents));
+            return NormalizePrice(exitPrice);
         }
 
-        private decimal Calc_TP_Price_SHORT_TakeWantedCleanProfit_MONEY(Position p, decimal wantedCleanProfitMoney)
+        private decimal Calc_EXIT_Price_SHORT_TakeWantedCleanProfit_MONEY(Position p, decimal wantedCleanProfitMoney)
         {
+            // Profit will be a bit BIGGER than expected because of price rouding to SMALLER size
             decimal feeInPercents = _bot.ComissionValue;
-            return (p.OpenVolume * p.EntryPrice * (100 - feeInPercents) - 100 * wantedCleanProfitMoney) / (p.OpenVolume * (100 + feeInPercents));
+            decimal exitPrice = (p.MaxVolume * p.EntryPrice * (100 - feeInPercents) - 100 * wantedCleanProfitMoney) / (p.MaxVolume * (100 + feeInPercents));
+            return NormalizePrice(exitPrice);
         }
 
-        private decimal Calc_EP_Price_ForRecovery_MAIN_is_LONG(decimal squeezeUpBandPriceRecentlyUsed)
+        private decimal Calc_BE_Price(bool loggingEnabled = false)
         {
-            return squeezeUpBandPriceRecentlyUsed - _squeezeSize * StartRecoveryDistanceInSqueezes.ValueDecimal;
+            return Calc_BE_Price(_mainPosition.Direction, _mainPosition.MaxVolume, _recoveryPosition.MaxVolume, _mainPosition.EntryPrice, _recoveryPosition.EntryPrice, loggingEnabled);
         }
 
-        private decimal Calc_EP_Price_ForRecovery_MAIN_is_SHORT(decimal squeezeDownBandPriceRecentlyUsed)
+        private decimal Calc_BE_PriceIfSwapped(bool loggingEnabled = false)
         {
-            return squeezeDownBandPriceRecentlyUsed + _squeezeSize * StartRecoveryDistanceInSqueezes.ValueDecimal;
+            return Calc_BE_Price(_recoveryPosition.Direction, _recoveryPosition.MaxVolume, _mainPosition.MaxVolume, _recoveryPosition.EntryPrice, _mainPosition.EntryPrice, loggingEnabled);
         }
 
-        private decimal Calc_BE_Price()
+        private decimal Calc_BE_Price(Side mainDirection, decimal mainVolume, decimal recoveryVolume, decimal main_EP, decimal recovery_EP, bool loggingEnabled = false)
         {
-            return _recoveryPosition.Direction == Side.Buy ?
-                Calc_BE_Price_MAIN_is_SHORT(_recoveryPosition.OpenVolume, _mainPosition.OpenVolume, _recoveryPosition.EntryPrice, _mainPosition.EntryPrice) :
-                Calc_BE_Price_MAIN_is_LONG(_mainPosition.OpenVolume, _recoveryPosition.OpenVolume, _mainPosition.EntryPrice, _recoveryPosition.EntryPrice);
+            // ************************************** NOTE: ******************************************
+            // * 1) When recovery COINS volume becomes bigger than main COINS volume, then BE price  *
+            // * can be negative which means that BE price doesn't exist for this situation.         *
+            // * EXAMPLE: (deal start = 26.09.2022 11:05:00 | 5mADA2022to2023flat)                   *
+            // * 2) Also we can't apply BE price when it is already reached by current price.        *
+            // * 3) We can't apply BE price as well, when it is further than liquidation price for   *
+            // one or both positions. In case of Binance Futures Cross Margin it is allowed to have  *
+            // a huge liquidation price when in hedge situation. In this case liquidation price is   *
+            // going to be calculated based on both positions PnL and free USDT assets. It is kind   *
+            // of allowing to lose more than it was invested into position as long as you have       *
+            // another position which in opposite direction and which allows to cover your loses.    *
+            // In this case you will never finish deal with negative balance which is not acceptable *
+            // for Exchange. You will never be able to have the same huge liquidation price with one *
+            // position only. Exchange will allow you just lose everything you invested but not      *
+            // more. So, your liquidation price will never be that big as in hedge situation.        *
+            // *                                                                                     *
+            // * It is OK, it just means that we can only finish deal by exiting recoveryPos         *
+            // * first and mainPos after. There is no way to finish deal by this BE price from       *
+            // * mentioned cases above.                                                              *
+            // * In these cases we just set main_TP and recovery_SL at unreachably far values and    *
+            // wait for recovery position to recover some money again.                               *
+            // ***************************************************************************************
+
+            decimal availableAlreadyRecoveredCleanProfitMoney = ClosedPosesCleanProfitMoneySum;
+            decimal BE_price = mainDirection == Side.Sell ?
+                Calc_BE_Price_ByFormula(recoveryVolume, mainVolume, recovery_EP, main_EP, availableAlreadyRecoveredCleanProfitMoney) :
+                Calc_BE_Price_ByFormula(mainVolume, recoveryVolume, main_EP, recovery_EP, availableAlreadyRecoveredCleanProfitMoney);
+
+            if (loggingEnabled)
+            {
+                OlegUtils.Log("BE = {0}; CurPrice = {1}; recCleanProfitMoney = {2}", 
+                    TruncatePrice(BE_price), TruncatePrice(GetCurrentPrice()), TruncateMoney(ClosedPosesCleanProfitMoneySum));
+            }
+
+            bool BE_PriceNegative = BE_price < 0;
+            bool BE_PriceAlreadyReached = mainDirection == Side.Buy ?
+                GetCurrentPrice() >= BE_price : GetCurrentPrice() <= BE_price;
+
+            if (BE_PriceNegative || BE_PriceAlreadyReached)
+            {
+                decimal unreachablePrice = mainDirection == Side.Buy ? MAX_PRICE : MIN_PRICE;
+                if (loggingEnabled)
+                {
+                    OlegUtils.Log("Unable to set BE price = {0}; CUR price = {1}; MAIN pos is {2}! " +
+                        "Will use {3} value instead.", TruncatePrice(BE_price), GetCurrentPrice(),
+                        mainDirection == Side.Buy ? "LONG" : "SHORT",
+                        unreachablePrice.ToStringWithNoEndZero());
+                }
+                BE_price = unreachablePrice;
+            }
+
+            return BE_price;
         }
 
-        private decimal Calc_BE_Price_MAIN_is_LONG(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short)
+        private decimal Calc_BE_Price_ByFormula(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short, decimal availableAlreadyRecoveredCleanProfitMoney)
         {
             decimal fee = _bot.ComissionValue;
-            return (volLong * EP_Long * (100 + fee) - volShort * EP_Short * (100 - fee) - 100 * _availableMoney) / (volLong * (100 - fee) - volShort * (100 + fee));
+            decimal BE_Price = (volLong * EP_Long * (100 + fee) - volShort * EP_Short * (100 - fee) - 100 * availableAlreadyRecoveredCleanProfitMoney) / (volLong * (100 - fee) - volShort * (100 + fee));
+            return NormalizePrice(BE_Price);
         }
 
-        private decimal Calc_BE_Price_MAIN_is_SHORT(decimal volLong, decimal volShort, decimal EP_Long, decimal EP_Short)
+        private decimal CalcCoinsVolume_RecoveryPosition_ByPriceBE_MAIN_is_LONG(decimal volLong, decimal BE_Price, decimal EP_Long, decimal EP_Short, decimal availableMoney)
         {
             decimal fee = _bot.ComissionValue;
-            return (volLong * EP_Long * (100 + fee) - volShort * EP_Short * (100 - fee) - 100 * _availableMoney) / (volLong * (100 - fee) - volShort * (100 + fee));
+            return (volLong * EP_Long * (100 + fee) - BE_Price * volLong * (100 - fee) - 100 * availableMoney) / (EP_Short * (100 - fee) - BE_Price * (100 + fee));
         }
 
-        private decimal CalcCoinsVolume_MainPosition(Side side, decimal price)
+        private decimal CalcCoinsVolume_RecoveryPosition_ByPriceBE_MAIN_is_SHORT(decimal volShort, decimal BE_Price, decimal EP_Long, decimal EP_Short, decimal availableMoney)
+        {
+            decimal fee = _bot.ComissionValue;
+            return (BE_Price * volShort * (100 + fee) - volShort * EP_Short * (100 - fee) - 100 * availableMoney) / (BE_Price * (100 - fee) - EP_Long * (100 + fee));
+        }
+
+        private decimal CalcCoinsVolume_MainPosition(decimal entryPrice)
         {
             decimal coinsVolume = 0;
             decimal mainPositionVolumeInMoney = CalcInitialMoneyVolume_MainPosition();
             if (mainPositionVolumeInMoney > 0)
             {
-                coinsVolume = ConvertMoneyToCoins(side, mainPositionVolumeInMoney, price);
+                coinsVolume = ConvertEntryMoneyToCoins(mainPositionVolumeInMoney, entryPrice);
             }
             return coinsVolume;
         }
 
-        private decimal CalcCoinsVolume_RecoveryPosition(Side side, decimal price)
+        private decimal CalcCoinsVolume_RecoveryPosition(decimal entryPrice)
         {
-            decimal coinsVolume = 0;
-            decimal recoveryPositionVolumeInMoney = CalcInitialMoneyVolume_RecoveryPosition();
-            if (recoveryPositionVolumeInMoney > 0)
+            decimal availableMoneyForRecovery = CalcInitialMoneyVolume_RecoveryPosition();
+
+            bool reinvestmentEnabled = 
+                RecoveryVolumeMode.ValueString == REINVESTMENT ||
+                RecoveryVolumeMode.ValueString == REINVESTMENT_SWAP;
+            if (reinvestmentEnabled && GetLastClosedRecoveryPosition() != null)
             {
-                if (RecoveryVolumeMode.ValueString == REINVESTMENT)
-                {
-                    recoveryPositionVolumeInMoney += _availableMoney;
-                }
-                coinsVolume = ConvertMoneyToCoins(side, recoveryPositionVolumeInMoney, price);
+                availableMoneyForRecovery = _nonLockedMoneyAmount;
             }
+
+            decimal coinsVolume = ConvertEntryMoneyToCoins(availableMoneyForRecovery, entryPrice);
+
+            bool swappingEnabled = RecoveryVolumeMode.ValueString == REINVESTMENT_SWAP;
+            if (!swappingEnabled)
+            {
+                decimal volumeStep = GetVolumeStep();
+                decimal BE_Price = Calc_BE_Price(_mainPosition.Direction, _mainPosition.MaxVolume, coinsVolume, _mainPosition.EntryPrice, entryPrice);
+                decimal moneyNeeded = ConvertEntryCoinsToMoney(coinsVolume, BE_Price);
+                bool enoughMoney = availableMoneyForRecovery > moneyNeeded;
+
+                while (coinsVolume > 0 && (IsPriceUreachable(BE_Price) || !enoughMoney))
+                {
+                    coinsVolume -= volumeStep;
+                    BE_Price = Calc_BE_Price(_mainPosition.Direction, _mainPosition.MaxVolume, coinsVolume, _mainPosition.EntryPrice, entryPrice);
+                    moneyNeeded = ConvertEntryCoinsToMoney(coinsVolume, BE_Price);
+                    enoughMoney = availableMoneyForRecovery > moneyNeeded;
+                }
+            }
+
+            if (coinsVolume <= 0)
+            {
+                ThrowException("Entry volume can't be less or equal to 0!");
+            }
+
             return coinsVolume;
         }
 
@@ -435,14 +882,14 @@ namespace OsEngine.Robots.Oleg.Good
         {
             decimal mainPositionVolumeInPercents, recoveryPositionVolumeInPercents, totalDealVolumeInPercents;
             CalcVolumePercentages(out mainPositionVolumeInPercents, out recoveryPositionVolumeInPercents, out totalDealVolumeInPercents);
-            return _balanceOnStart * mainPositionVolumeInPercents / totalDealVolumeInPercents;
+            return _balanceMoneyOnDealStart * mainPositionVolumeInPercents / totalDealVolumeInPercents;
         }
 
         private decimal CalcInitialMoneyVolume_RecoveryPosition()
         {
             decimal mainPositionVolumeInPercents, recoveryPositionVolumeInPercents, totalDealVolumeInPercents;
             CalcVolumePercentages(out mainPositionVolumeInPercents, out recoveryPositionVolumeInPercents, out totalDealVolumeInPercents);
-            return _balanceOnStart * recoveryPositionVolumeInPercents / totalDealVolumeInPercents;
+            return _balanceMoneyOnDealStart * recoveryPositionVolumeInPercents / totalDealVolumeInPercents;
         }
 
         private void CalcVolumePercentages(out decimal mainPositionVolumeInPercents, out decimal recoveryPositionVolumeInPercents, out decimal totalDealVolumeInPercents)
@@ -452,6 +899,12 @@ namespace OsEngine.Robots.Oleg.Good
             totalDealVolumeInPercents = mainPositionVolumeInPercents + recoveryPositionVolumeInPercents;
         }
 
+        private decimal CalcMainPositionMinWantedProfitInMoney()
+        {
+            decimal moneyIn = ConvertEntryCoinsToMoney(_mainPosition.MaxVolume, _mainPosition.EntryPrice);
+            return moneyIn * MinWantedCleanProfitPercent.ValueDecimal / 100;
+        }
+
         private decimal CalcPositionCleanProfitMoney(Position p)
         {
             return CalcPositionCleanProfitMoney(p, p.ClosePrice);
@@ -459,8 +912,8 @@ namespace OsEngine.Robots.Oleg.Good
 
         private decimal CalcPositionCleanProfitMoney(Position p, decimal closePrice)
         {
-            decimal moneyIn = p.OpenVolume * p.EntryPrice;
-            decimal moneyOut = p.OpenVolume * closePrice;
+            decimal moneyIn = p.MaxVolume * p.EntryPrice;
+            decimal moneyOut = p.MaxVolume * closePrice;
             decimal profitMoney = p.Direction == Side.Buy ? moneyOut - moneyIn : moneyIn - moneyOut;
             decimal feeIn = moneyIn * _bot.ComissionValue / 100;
             decimal feeOut = moneyOut * _bot.ComissionValue / 100;
@@ -468,30 +921,163 @@ namespace OsEngine.Robots.Oleg.Good
             return profitMoney - feeMoney;
         }
 
-        private decimal ConvertMoneyToCoins(Side side, decimal money, decimal price)
+        private decimal ConvertEntryMoneyToCoins(decimal entryMoney, decimal entryPrice)
         {
-            decimal moneyNeededForFee = money / 100 * _bot.ComissionValue;
-            decimal moneyLeftForCoins = money - moneyNeededForFee;
-            decimal coinsVolumeDirty = moneyLeftForCoins / price;
-            return Math.Round(coinsVolumeDirty, VolumeDecimals.ValueInt);
+            decimal moneyNeededForFee = entryMoney / 100 * _bot.ComissionValue;
+            decimal moneyLeftForCoins = entryMoney - moneyNeededForFee;
+            decimal coinsVolumeDirty = moneyLeftForCoins / entryPrice;
+            return TruncateDecimal(coinsVolumeDirty, VolumeDecimals.ValueInt);
         }
 
-        private decimal ConvertCoinsToMoney(decimal coins, decimal price)
+        private decimal ConvertEntryCoinsToMoney(decimal entryCoins, decimal entryPrice)
         {
-            decimal coinsMoney = coins * price;
-            decimal feeMoney = coinsMoney * _bot.ComissionValue / 100;
-            return coinsMoney + feeMoney;
+            decimal moneySpentForEntryCoins = entryCoins * entryPrice;
+            decimal moneySpentForEntryFee = moneySpentForEntryCoins * _bot.ComissionValue / 100;
+            return moneySpentForEntryCoins + moneySpentForEntryFee;
         }
 
-        private bool IsEnoughDataAndEnoughMoneyAndEnabledToTrade()
+        private Position GetLastClosedRecoveryPosition()
+        {
+            for (int i = _dealPositions.Count - 1; i >= 0; i--)
+            {
+                if (_dealPositions[i].State == PositionStateType.Done)
+                {
+                    return _dealPositions[i];
+                }
+            }
+            return null;
+        }
+
+        private decimal TruncateMoney(decimal money)
+        {
+            return TruncateDecimal(money, 2);
+        }
+
+        private decimal TruncatePrice(decimal price)
+        {
+            decimal priceFromOrderBook = TabsSimple != null && TabsSimple.Count > 0 ? TabsSimple[0].PriceBestAsk : 0;
+            if (priceFromOrderBook > 0)
+            {
+                int priceDecimalDigitsNumber = GetDecimalDigitsNumber(priceFromOrderBook);
+                price = TruncateDecimal(price, priceDecimalDigitsNumber);
+            }
+            return price;
+        }
+
+        private int GetDecimalDigitsNumber(decimal someNumber)
+        {
+            string numberAsText = someNumber.ToString().TrimEnd('0');
+            int decimalPointIndex = numberAsText.IndexOf(Thread.CurrentThread.CurrentCulture.NumberFormat.NumberDecimalSeparator);
+            string integerPartAndPoint = numberAsText.Substring(0, decimalPointIndex + 1);
+            string decimalPart = numberAsText.Replace(integerPartAndPoint, String.Empty);
+            return decimalPart.Length;
+        }
+
+        private decimal TruncateDecimal(decimal decimalNumber, int decimalDigitsCount)
+        {
+            if (decimalDigitsCount < 0)
+            {
+                ThrowException("DecimalDigitsCount cannot be less than zero");
+            }
+            string decimalNumberAsText = decimalNumber.ToString();
+            int decimalPointIndex = decimalNumberAsText.IndexOf(Thread.CurrentThread.CurrentCulture.NumberFormat.NumberDecimalSeparator);
+            if (decimalPointIndex < 0)
+            {
+                return decimalNumber;
+            }
+            int newLength = decimalPointIndex + decimalDigitsCount + 1;
+            while (newLength > decimalNumberAsText.Length)
+            {
+                newLength--;
+            }
+            return Convert.ToDecimal(decimalNumberAsText.Substring(0, newLength).TrimEnd('0'));
+        }
+
+        private bool IsEnoughDataAndEnabledToTrade()
         {
             int candlesCount = _bot.CandlesAll != null ? _bot.CandlesAll.Count : 0;
-            bool robotEnabled = Regime.ValueString == "On";
+            bool robotEnabled = Regime.ValueString == "On" || Regime.ValueString == "OnlyLong" || Regime.ValueString == "OnlyShort";
             bool enoughCandlesForBollinger = candlesCount > BollingerLength.ValueInt;
             bool enoughCandlesForBollingerSqueeze = candlesCount > BollingerSqueezePeriod.ValueInt;
-            _balanceOnStart = _balanceOnStart == 0 ? _bot.Portfolio.ValueCurrent : _balanceOnStart;
-            bool enoughMoney = CalcInitialMoneyVolume_RecoveryPosition() >= MinVolumeUSDT.ValueDecimal;
-            return robotEnabled && enoughCandlesForBollinger && enoughCandlesForBollingerSqueeze && enoughMoney;
+            _balanceMoneyOnDealStart = _balanceMoneyOnDealStart == 0 ? _bot.Portfolio.ValueCurrent : _balanceMoneyOnDealStart;
+            return robotEnabled && enoughCandlesForBollinger && enoughCandlesForBollingerSqueeze;
         }
+
+        private decimal GetCurrentPrice()
+        {
+            return _bot != null && _bot.CandlesAll != null && _bot.CandlesAll.Count > 0 ? 
+                _bot.CandlesAll.Last().Close : 0;
+        }
+
+        private decimal GetCurrentDealBalance()
+        {
+            decimal finishDealNowMoney = 0m;
+            if (_mainPosition != null && _mainPosition.State != PositionStateType.Done)
+            {
+                decimal mainPositionEntryMoney = ConvertEntryCoinsToMoney(_mainPosition.MaxVolume, _mainPosition.EntryPrice);
+                decimal mainPositionCurrentProfitMoney = CalcPositionCleanProfitMoney(_mainPosition, GetCurrentPrice());
+                finishDealNowMoney += mainPositionEntryMoney;
+                finishDealNowMoney += mainPositionCurrentProfitMoney;
+            }
+            if (_recoveryPosition != null && _recoveryPosition.State != PositionStateType.Done)
+            {
+                decimal recoveryPositionEntryMoney = ConvertEntryCoinsToMoney(_recoveryPosition.MaxVolume, _recoveryPosition.EntryPrice);
+                decimal recoveryPositionCurrentProfitMoney = CalcPositionCleanProfitMoney(_recoveryPosition, GetCurrentPrice());
+                finishDealNowMoney += recoveryPositionEntryMoney;
+                finishDealNowMoney += recoveryPositionCurrentProfitMoney;
+            }
+            finishDealNowMoney += _nonLockedMoneyAmount;
+            decimal dealBalance = finishDealNowMoney - _balanceMoneyOnDealStart;
+            return dealBalance;
+        }
+
+        private bool PositionClosedBySL(Position p)
+        {
+            decimal distanceTP = Math.Abs(p.ProfitOrderRedLine - p.ClosePrice);
+            decimal distanceSL = Math.Abs(p.StopOrderRedLine - p.ClosePrice);
+            return distanceSL < distanceTP;
+        }
+
+        private bool IsPriceUreachable(decimal price)
+        {
+            return price == MIN_PRICE || price == MAX_PRICE;
+        }
+
+        private decimal GetVolumeStep()
+        {
+            if (VolumeDecimals.ValueInt != 0)
+            {
+                string decimalZeros = String.Empty;
+                for (int i = 1; i < VolumeDecimals.ValueInt; i++)
+                {
+                    decimalZeros += "0";
+                }
+                string volumeStepString = String.Format("0{0}{1}1", Thread.CurrentThread.CurrentCulture.NumberFormat.NumberDecimalSeparator, decimalZeros);
+                return Decimal.Parse(volumeStepString);
+            }
+            return 1m;
+        }
+
+        private decimal NormalizePrice(decimal price)
+        {
+            return price - price % _bot.Securiti.PriceStep;
+        }
+
+        private void ThrowException(string messageTemplate, params object[] messageArgs)
+        {
+            string message = "ERROR : " + String.Format(messageTemplate, messageArgs);
+            OlegUtils.Log(message);
+            throw new Exception(message);
+        }
+    }
+
+    enum Situation
+    {
+        NONE,
+        FIRST_TRY,
+        MAIN_POS_ON_BE,
+        TWO_POSES_ON_BE,
+        TWO_POSES_REC_ON_SHIFTED_EXIT,
+        MAIN_POS_ON_BE_AND_REC_ON_SHIFTED_ENTRY
     }
 }

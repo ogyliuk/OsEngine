@@ -34,6 +34,9 @@ namespace OsEngine.Market.Servers.Tester
         public TesterServerUi(TesterServer server, Log log)
         {
             InitializeComponent();
+            this.WindowStartupLocation = WindowStartupLocation.Manual;
+            this.Left = 0;
+            this.Top = 0;
             _server = server;
             _server.LoadSecurityTestSettings();
             LabelStatus.Content = _server.ServerStatus;
