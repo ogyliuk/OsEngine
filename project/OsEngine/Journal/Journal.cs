@@ -355,13 +355,13 @@ namespace OsEngine.Journal
             }
         }
 
-        void _positionController_PositionNetVolumeChangeEvent(Position position)
+        void _positionController_PositionNetVolumeChangeEvent(Position position, decimal volumeChangeCoins, decimal volumeChangePrice, DateTime volumeChangeTime)
         {
             try
             {
                 if (PositionNetVolumeChangeEvent != null)
                 {
-                    PositionNetVolumeChangeEvent(position);
+                    PositionNetVolumeChangeEvent(position, volumeChangeCoins, volumeChangePrice, volumeChangeTime);
                 }
             }
             catch (Exception error)
@@ -603,7 +603,7 @@ namespace OsEngine.Journal
         /// the open volume of the transaction has changed
         /// изменился открытый объём по сделке
         /// </summary>
-        public event Action<Position> PositionNetVolumeChangeEvent;
+        public event Action<Position, decimal, decimal, DateTime> PositionNetVolumeChangeEvent;
 
         /// <summary>
         /// the user has selected an action in the pop-up menu

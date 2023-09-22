@@ -3905,11 +3905,11 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// open position volume changed
         /// изменился открытый объём по сделке
         /// </summary>
-        void _journal_PositionNetVolumeChangeEvent(Position position)
+        void _journal_PositionNetVolumeChangeEvent(Position position, decimal volumeChangeCoins, decimal volumeChangePrice, DateTime volumeChangeTime)
         {
             if (PositionNetVolumeChangeEvent != null)
             {
-                PositionNetVolumeChangeEvent(position);
+                PositionNetVolumeChangeEvent(position, volumeChangeCoins, volumeChangePrice, volumeChangeTime);
             }
         }
 
@@ -4384,7 +4384,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// open position volume has changed / 
         /// у позиции изменился открытый объём
         /// </summary>
-        public event Action<Position> PositionNetVolumeChangeEvent;
+        public event Action<Position, decimal, decimal, DateTime> PositionNetVolumeChangeEvent;
 
         /// <summary>
         /// opening position failed / 

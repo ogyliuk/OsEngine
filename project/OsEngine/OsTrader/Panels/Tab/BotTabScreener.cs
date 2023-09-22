@@ -1559,7 +1559,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                     PositionOpeningSuccesEvent(pos, tab);
                 }
             };
-            tab.PositionNetVolumeChangeEvent += (Position pos) =>
+            tab.PositionNetVolumeChangeEvent += (Position pos, decimal volumeChangeCoins, decimal volumeChangePrice, DateTime volumeChangeTime) =>
             {
                 if (PositionNetVolumeChangeEvent != null)
                 {

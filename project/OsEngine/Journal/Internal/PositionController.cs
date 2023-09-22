@@ -561,7 +561,8 @@ namespace OsEngine.Journal.Internal
 
                     if (lastPosVolume != _deals[i].OpenVolume && PositionNetVolumeChangeEvent != null)
                     {
-                        PositionNetVolumeChangeEvent(_deals[i]);
+                        decimal volumeChangeCoins = _deals[i].OpenVolume - lastPosVolume;
+                        PositionNetVolumeChangeEvent(_deals[i], volumeChangeCoins, updateOrder.PriceReal, updateOrder.TimeDone);
                     }
 
                     if (i < _deals.Count)
@@ -646,7 +647,8 @@ namespace OsEngine.Journal.Internal
 
                     if (lastPosVolume != position.OpenVolume && PositionNetVolumeChangeEvent != null)
                     {
-                        PositionNetVolumeChangeEvent(position);
+                        decimal volumeChangeCoins = position.OpenVolume - lastPosVolume;
+                        PositionNetVolumeChangeEvent(position, volumeChangeCoins, trade.Price, trade.Time);
                     }
 
                     ProcesPosition(position);
@@ -1842,7 +1844,7 @@ namespace OsEngine.Journal.Internal
         /// the open position volume has changed
         /// изменился открытый объём по позиции
         /// </summary>
-        public event Action<Position> PositionNetVolumeChangeEvent;
+        public event Action<Position, decimal, decimal, DateTime> PositionNetVolumeChangeEvent;
 
         /// <summary>
         /// the user has selected an action in the pop-up menu

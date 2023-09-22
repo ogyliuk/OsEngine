@@ -23,7 +23,7 @@ namespace OsEngine
         public static void LogSeparationLine()
         {
             string logFilePath = GetLogFilePath();
-            string logLine = "----------------------------------------------------------------------------------";
+            string logLine = "**********************************************************************************";
             LogLine(logFilePath, logLine);
         }
 
