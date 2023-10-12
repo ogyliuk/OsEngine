@@ -1273,7 +1273,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (IsMarketOrderSupport())
                 {
-                    return LongCreate(price, volume, type, timeLife, false);
+                    return LongCreate(price, volume, type, timeLife, false, null);
                 }
                 else
                 {
@@ -1318,7 +1318,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         {
             try
             {
-                return LongCreate(priceLimit, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, false);
+                return LongCreate(priceLimit, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, false, null);
             }
             catch (Exception error)
             {
@@ -1707,7 +1707,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// cancel all purchase requisitions at level cross / 
         /// отменить все заявки на покупку по пробитию уровня
         /// </summary>
-        public void BuyAtStopCancel()
+        public void BuyAtStopCancel(string signalType = null)
         {
             try
             {
@@ -1718,7 +1718,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 for (int i = 0; _stopsOpener.Count != 0 && i < _stopsOpener.Count; i++)
                 {
-                    if (_stopsOpener[i].Side == Side.Buy)
+                    if (_stopsOpener[i].Side == Side.Buy && (signalType == null || _stopsOpener[i].SignalType == signalType))
                     {
                         _stopsOpener.RemoveAt(i);
                         i--;
@@ -1756,7 +1756,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 if (IsMarketOrderSupport())
                 {
-                    return ShortCreate(price, volume, type, timeLife, false);
+                    return ShortCreate(price, volume, type, timeLife, false, null);
                 }
                 else
                 {
@@ -1798,7 +1798,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         {
             try
             {
-                return ShortCreate(priceLimit, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, false);
+                return ShortCreate(priceLimit, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, false, null);
             }
             catch (Exception error)
             {
@@ -2175,7 +2175,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// cancel all purchase requisitions at level cross / 
         /// отменить все заявки на продажу по пробитию уровня
         /// </summary>
-        public void SellAtStopCancel()
+        public void SellAtStopCancel(string signalType = null)
         {
             try
             {
@@ -2186,7 +2186,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 for (int i = 0; _stopsOpener.Count != 0 && i < _stopsOpener.Count; i++)
                 {
-                    if (_stopsOpener[i].Side == Side.Sell)
+                    if (_stopsOpener[i].Side == Side.Sell && (signalType == null || _stopsOpener[i].SignalType == signalType))
                     {
                         _stopsOpener.RemoveAt(i);// будет работать
                         i--;
@@ -2641,7 +2641,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="timeLife">life time / время жизни</param>
         /// <param name="isStopOrProfit">whether the order is a result of a stop or a profit / является ли ордер следствием срабатывания стопа или профита</param>
         private Position ShortCreate(decimal price, decimal volume, OrderPriceType priceType, TimeSpan timeLife,
-            bool isStopOrProfit)
+            bool isStopOrProfit, string signalType)
         {
             try
             {
@@ -2671,6 +2671,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 Position newDeal = _dealCreator.CreatePosition(TabName, direction, price, volume, priceType,
                     timeLife, Securiti, Portfolio, StartProgram);
                 newDeal.OpenOrders[0].IsStopOrProfit = isStopOrProfit;
+                newDeal.SignalTypeOpen = signalType;
                 _journal.SetNewDeal(newDeal);
 
                 _connector.OrderExecute(newDeal.OpenOrders[0]);
@@ -2756,7 +2757,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="timeLife">life time / время жизни</param>
         /// <param name="isStopOrProfit">whether the order is a result of a stop or a profit / является ли ордер следствием срабатывания стопа или профита</param>
         private Position LongCreate(decimal price, decimal volume, OrderPriceType priceType, TimeSpan timeLife,
-            bool isStopOrProfit) // купить
+            bool isStopOrProfit, string signalType) // купить
         {
             try
             {
@@ -2789,6 +2790,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 Position newDeal = _dealCreator.CreatePosition(TabName, direction, price, volume, priceType,
                     timeLife, Securiti, Portfolio, StartProgram);
                 newDeal.OpenOrders[0].IsStopOrProfit = isStopOrProfit;
+                newDeal.SignalTypeOpen = signalType;
                 _journal.SetNewDeal(newDeal);
 
                 _connector.OrderExecute(newDeal.OpenOrders[0]);
@@ -3658,8 +3660,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                             (activateType == StopActivateType.LowerOrEqyal && price <= priceRedLine))
                         {
                             Position p = side == Side.Buy ?
-                                LongCreate(priceOrder, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, true) :
-                                ShortCreate(priceOrder, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, true);
+                                LongCreate(priceOrder, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, true, signalType) :
+                                ShortCreate(priceOrder, volume, OrderPriceType.Limit, ManualPositionSupport.SecondToOpen, true, signalType);
                             if (p != null)
                             {
                                 if (!String.IsNullOrEmpty(signalType))
