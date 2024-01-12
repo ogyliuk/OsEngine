@@ -2038,7 +2038,7 @@ namespace OsEngine.Market.Servers
             {
                 UserSetOrderOnExecute(order);
             }
-            if (LastStartServerTime.AddSeconds(_waitTimeAfterFirstStart) > DateTime.Now)
+            /*if (LastStartServerTime.AddSeconds(_waitTimeAfterFirstStart) > DateTime.Now)
             {
                 order.State = OrderStateType.Fail;
                 _ordersToSend.Enqueue(order);
@@ -2048,7 +2048,7 @@ namespace OsEngine.Market.Servers
                 SendLogMessage(OsLocalization.Market.Message17 + order.NumberUser +
                                OsLocalization.Market.Message18 + mes, LogMessageType.Error);
                 return;
-            }
+            }*/
 
             order.TimeCreate = ServerTime;
 
