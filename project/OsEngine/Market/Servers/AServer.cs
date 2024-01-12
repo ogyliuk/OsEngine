@@ -2043,8 +2043,10 @@ namespace OsEngine.Market.Servers
                 order.State = OrderStateType.Fail;
                 _ordersToSend.Enqueue(order);
 
+                string mes = String.Format(" {0} add seconds {1} > than {2}. ", LastStartServerTime.ToString("dd.MM.yyyy_HH-mm-ss.fff"), _waitTimeAfterFirstStart, DateTime.Now);
+
                 SendLogMessage(OsLocalization.Market.Message17 + order.NumberUser +
-                               OsLocalization.Market.Message18, LogMessageType.Error);
+                               OsLocalization.Market.Message18 + mes, LogMessageType.Error);
                 return;
             }
 
