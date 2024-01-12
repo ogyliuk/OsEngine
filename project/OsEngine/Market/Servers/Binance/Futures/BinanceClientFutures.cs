@@ -1880,13 +1880,13 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 {
                     return;
                 }
-                var rs = CreateQuery(Method.GET, "/" + type_str_selector + "/v1/positionSide/dual", new Dictionary<string, string>(),true);
+                Dictionary<string, string> param = new Dictionary<string, string>() { { "recvWindow=", "50000" } };
+                var rs = CreateQuery(Method.GET, "/" + type_str_selector + "/v1/positionSide/dual", param, true);
                 if (rs != null)
                 {
                     var modeNow = JsonConvert.DeserializeAnonymousType(rs, new HedgeModeResponse());
                     if(modeNow.dualSidePosition != HedgeMode)
                     {
-                        var param = new Dictionary<string, string>();
                         param.Add("dualSidePosition=", HedgeMode.ToString().ToLower());
                         CreateQuery(Method.POST, "/" + type_str_selector + "/v1/positionSide/dual", param, true);
                     }
