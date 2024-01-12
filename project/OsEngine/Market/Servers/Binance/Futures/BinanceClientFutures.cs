@@ -887,7 +887,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 lock (_queryHttpLocker)
                 {
                     _rateGate.WaitToProceed();
-                    return PerformHttpRequest(method, endpoint, param, auth);
+                    return PerformHttpRequest(method, ref endpoint, param, auth);
                 }
             }
             catch (Exception ex)
@@ -909,7 +909,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
         {
             try
             {
-                return PerformHttpRequest(method, endpoint, param, auth);
+                return PerformHttpRequest(method, ref endpoint, param, auth);
             }
             catch (Exception ex)
             {
@@ -918,7 +918,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             }
         }
 
-        private string PerformHttpRequest(Method method, string endpoint, Dictionary<string, string> param = null, bool auth = false)
+        private string PerformHttpRequest(Method method, ref string endpoint, Dictionary<string, string> param = null, bool auth = false)
         {
             string fullUrl = "";
 
@@ -951,7 +951,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 }
             }
 
-            var request = new RestRequest(endpoint + fullUrl, method);
+            endpoint = endpoint + fullUrl;
+            var request = new RestRequest(endpoint, method);
             request.AddHeader("X-MBX-APIKEY", ApiKey);
 
             string baseUrl = _baseUrl;
