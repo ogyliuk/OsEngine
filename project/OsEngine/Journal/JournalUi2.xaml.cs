@@ -2613,8 +2613,16 @@ namespace OsEngine.Journal
             _longPositions = _allPositions.FindAll(p => p.Direction == Side.Buy);
             _shortPositions = _allPositions.FindAll(p => p.Direction == Side.Sell);
 
-            startTime = _allPositions[0].TimeOpen;
-            endTime = _allPositions[_allPositions.Count - 1].TimeOpen;
+            if (_allPositions == null || _allPositions.Count == 0)
+            {
+                startTime = DateTime.MinValue;
+                endTime = DateTime.MinValue;
+            }
+            else
+            {
+                startTime = _allPositions[0].TimeOpen;
+                endTime = _allPositions[_allPositions.Count - 1].TimeOpen;
+            }
             minTime = startTime;
             maxTime = endTime;
         }
