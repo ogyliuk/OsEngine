@@ -895,6 +895,7 @@
     </Compile>
     <Compile Include="Robots\BotFactory.cs" />
     <Compile Include="Robots\CounterTrend\ClusterCountertrend.cs" />
+    <Compile Include="Robots\Oleg\Good\BreakSqueezeStrategy.cs" />
     <Compile Include="Robots\Oleg\Good\Averaging.cs" />
     <Compile Include="Robots\Oleg\Good\AddToWinnerStrategy.cs" />
     <Compile Include="Robots\Oleg\Good\LetProfitGrow.cs" />
