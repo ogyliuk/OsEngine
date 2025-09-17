@@ -205,6 +205,10 @@ namespace OsEngine.Charts.CandleChart
                         {
                             CreateIndicator(new Rsi(indicator[1], Convert.ToBoolean(indicator[3])), indicator[2]);
                         }
+                        if (indicator[0] == "RsiDivergence")
+                        {
+                            CreateIndicator(new RsiDivergence(indicator[1], Convert.ToBoolean(indicator[3])), indicator[2]);
+                        }
                         if (indicator[0] == "Roc")
                         {
                             CreateIndicator(new Roc(indicator[1], Convert.ToBoolean(indicator[3])), indicator[2]);
@@ -935,16 +939,25 @@ namespace OsEngine.Charts.CandleChart
                     for (int i = 0; i < multiElementIndicator.Elements.Count; i++)
                     {
                         IndicatorElement indicatorElement = multiElementIndicator.Elements[i];
-                        if (inNewArea == false)
+                        string area = inNewArea ? ChartCandle.CreateArea(nameArea, 15) : nameArea;
+                        if (indicatorElement.Type == IndicatorChartPaintType.LineSegments)
                         {
-                            indicator.NameSeries = ChartCandle.CreateSeries(nameArea,
-                                indicatorElement.Type, indicator.Name + i);
+                            for (int j = 0; j < indicatorElement.ValuesToChart.Count; j++)
+                            {
+                                string seriesName = ChartCandle.CreateSeries(area, indicatorElement.Type, String.Format("{0}{1}{2}", indicator.Name, i, j));
+                                if (i == 0)
+                                {
+                                    indicator.NameSeries = seriesName;
+                                }
+                            }
                         }
                         else
                         {
-                            string area = ChartCandle.CreateArea(nameArea, 15);
-                            indicator.NameSeries = ChartCandle.CreateSeries(area,
-                                indicatorElement.Type, indicator.Name + i);
+                            string seriesName = ChartCandle.CreateSeries(area, indicatorElement.Type, indicator.Name + i);
+                            if (i == 0)
+                            {
+                                indicator.NameSeries = seriesName;
+                            }
                         }
                     }
                 }

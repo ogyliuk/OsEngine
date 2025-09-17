@@ -18,12 +18,11 @@ namespace OsEngine.Robots.Oleg.Good
     {
         private BotTabSimple _bot;
 
-        private decimal BALANCE_USDT;
+        private decimal balanceUsdt;
+        private decimal balanceCoin;
         private Position currentPosition;
         private DateTime lastBalanceDate;
         private decimal lastBalancePrice;
-        private decimal legBTC = 0;
-        private decimal legUSDT = 0;
         private int rebalanceCount = 0;
 
         private StrategyParameterString Regime;
@@ -58,14 +57,13 @@ namespace OsEngine.Robots.Oleg.Good
                 decimal price = candles.Last().Close;
                 DateTime date = candles.Last().TimeStart;
 
-                // 1st BALANCE
-                if (legBTC == 0 && legUSDT == 0)
+                // BEGINNING : Divide DEPO by halfs
+                if (balanceCoin == 0 && balanceUsdt == 0)
                 {
-                    this.BALANCE_USDT = _bot.Portfolio.ValueCurrent;
-                    this.legUSDT = BALANCE_USDT / 2;
-                    this.legBTC = BALANCE_USDT / 2 / price;
-                    // _bot.BuyAtLimit(legBTC, price);
-                    currentPosition = _bot.BuyAtMarket(legBTC);
+                    decimal halfDepoUsdt = _bot.Portfolio.ValueCurrent / 2;
+                    this.balanceUsdt = halfDepoUsdt;
+                    this.balanceCoin = halfDepoUsdt / price;
+                    this.currentPosition = _bot.BuyAtMarket(balanceCoin);
                     this.lastBalancePrice = price;
                     this.lastBalanceDate = date;
                     return;
@@ -86,43 +84,43 @@ namespace OsEngine.Robots.Oleg.Good
                         Math.Round(lastBalancePrice, 0), 
                         Math.Round(price, 0));
 
-                    decimal newLegUSDT = legUSDT;
-                    decimal newLegBTC = legBTC;
+                    decimal newBalanceUsdt = balanceUsdt;
+                    decimal newBalanceCoin = balanceCoin;
                     if (priceMove == PriceMove.UP)
                     {
                         // Close LONG succuss - Sell BTC
-                        decimal neededUsdtToGet = (legBTC * price - legUSDT) / 2;
+                        decimal neededUsdtToGet = (balanceCoin * price - balanceUsdt) / 2;
                         decimal neededBtcToSell = neededUsdtToGet / price;
-                        newLegUSDT = legUSDT + neededUsdtToGet;
-                        newLegBTC = legBTC - neededBtcToSell;
+                        newBalanceUsdt = balanceUsdt + neededUsdtToGet;
+                        newBalanceCoin = balanceCoin - neededBtcToSell;
                         //_bot.CloseAtLimit(currentPosition, price, currentPosition.OpenVolume);
                         _bot.CloseAtMarket(currentPosition, currentPosition.OpenVolume);
                         // _bot.BuyAtLimit(newLegBTC, price);
-                        currentPosition = _bot.BuyAtMarket(newLegBTC);
+                        currentPosition = _bot.BuyAtMarket(newBalanceCoin);
                     }
                     else if (priceMove == PriceMove.DOWN)
                     {
                         // Close SHORT succuss - Buy BTC
-                        decimal neededBtcToBuy = (legUSDT / price - legBTC) / 2;
+                        decimal neededBtcToBuy = (balanceUsdt / price - balanceCoin) / 2;
                         decimal neededUsdtToSpend = neededBtcToBuy * price;
-                        newLegUSDT = legUSDT - neededUsdtToSpend;
-                        newLegBTC = legBTC + neededBtcToBuy;
+                        newBalanceUsdt = balanceUsdt - neededUsdtToSpend;
+                        newBalanceCoin = balanceCoin + neededBtcToBuy;
                         // _bot.CloseAtLimit(currentPosition, price, currentPosition.OpenVolume);
                         _bot.CloseAtMarket(currentPosition, currentPosition.OpenVolume);
                         // _bot.BuyAtLimit(newLegBTC, price);
-                        currentPosition = _bot.BuyAtMarket(newLegBTC);
+                        currentPosition = _bot.BuyAtMarket(newBalanceCoin);
                     }
 
                     rebalanceCount++;
-                    decimal totalUSDT = legUSDT + legBTC * price;
+                    decimal totalUSDT = balanceUsdt + balanceCoin * price;
 
-                    OlegUtils.Log("USDT {0}$ ---> {1}$", Math.Round(legUSDT, 0), Math.Round(newLegUSDT, 0));
-                    OlegUtils.Log("BTC {0} ---> {1}", Math.Round(legBTC, 2), Math.Round(newLegBTC, 2));
+                    OlegUtils.Log("USDT {0}$ ---> {1}$", Math.Round(balanceUsdt, 0), Math.Round(newBalanceUsdt, 0));
+                    OlegUtils.Log("BTC {0} ---> {1}", Math.Round(balanceCoin, 2), Math.Round(newBalanceCoin, 2));
                     OlegUtils.Log("#{0} Total USDT = {1}$", rebalanceCount, Math.Round(totalUSDT, 0));
                     OlegUtils.Log("---------------------------------------------------------------------------");
 
-                    legUSDT = newLegUSDT;
-                    legBTC = newLegBTC;
+                    balanceUsdt = newBalanceUsdt;
+                    balanceCoin = newBalanceCoin;
 
                     this.lastBalancePrice = price;
                     this.lastBalanceDate = date;

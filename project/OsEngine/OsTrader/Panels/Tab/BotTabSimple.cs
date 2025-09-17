@@ -412,6 +412,11 @@ namespace OsEngine.OsTrader.Panels.Tab
 
         // drawing elements / рисование элементов
 
+        public System.Windows.Forms.DataVisualization.Charting.Chart GetChart()
+        {
+            return ((WinFormsChartPainter)_chartMaster.ChartCandle).GetChart();
+        }
+
         /// <summary>
         /// add custom element to the chart / 
         /// добавить на график пользовательский элемент

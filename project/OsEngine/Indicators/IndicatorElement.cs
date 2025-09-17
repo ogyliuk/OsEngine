@@ -1,19 +1,36 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Drawing;
 
 namespace OsEngine.Indicators
 {
     public class IndicatorElement
     {
-        public Color Color { get; private set; }
-        public List<decimal> ValuesToChart { get; private set; }
-        public IndicatorChartPaintType Type { get; private set; }
+        public Color Color { get; }
+        public List<object> ValuesToChart { get; }
+        public IndicatorChartPaintType Type { get; }
+        public bool FullReloadOnNewCandle { get; }
 
-        public IndicatorElement(Color color, List<decimal> valuesToChart, IndicatorChartPaintType type)
+        public IndicatorElement(Color color, IEnumerable valuesToChart, IndicatorChartPaintType type, bool fullReloadOnNewCandle = false)
         {
             Color = color;
-            ValuesToChart = valuesToChart;
+            IEnumerable<object> temp;
+            if (valuesToChart is List<object>)
+            {
+                temp = (List<object>)valuesToChart;
+            }
+            else if (valuesToChart is IEnumerable<object>)
+            {
+                temp = ((IEnumerable<object>)valuesToChart).ToList();
+            }
+            else
+            {
+                temp = Enumerable.Cast<object>(valuesToChart).ToList();
+            }
+            ValuesToChart = temp.ToList();
             Type = type;
+            FullReloadOnNewCandle = fullReloadOnNewCandle;
         }
     }
 }

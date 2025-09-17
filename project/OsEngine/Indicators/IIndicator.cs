@@ -132,6 +132,11 @@ namespace OsEngine.Indicators
         /// </summary>
         Point,
         /// <summary>
+        /// Line segments
+        /// Отрезки
+        /// </summary>
+        LineSegments,
+        /// <summary>
         /// Multiple elements on chart
         /// Несколько элементов на чарте
         /// </summary>

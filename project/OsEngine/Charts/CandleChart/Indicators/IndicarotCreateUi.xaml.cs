@@ -98,6 +98,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             _gridViewIndicators.Rows.Add("Pivot");
             _gridViewIndicators.Rows.Add("Pivot Points");
             _gridViewIndicators.Rows.Add("RSI");
+            _gridViewIndicators.Rows.Add("RSI_DIVERGENCE");
             _gridViewIndicators.Rows.Add("ROC");
             _gridViewIndicators.Rows.Add("RVI");
             _gridViewIndicators.Rows.Add("SimpleVWAP");
@@ -454,6 +455,21 @@ namespace OsEngine.Charts.CandleChart.Indicators
                     }
                 }
                 IndicatorCandle = new Rsi(_chartMaster.Name + name, true);
+                _chartMaster.CreateIndicator(IndicatorCandle, areaName);
+            }
+            if (_gridViewIndicators.SelectedCells[0].Value.ToString() == "RSI_DIVERGENCE")
+            {
+                string name = "";
+
+                for (int i = 0; i < 30; i++)
+                {
+                    if (_chartMaster.IndicatorIsCreate(_chartMaster.Name + "RSI_DIVERGENCE" + i) == false)
+                    {
+                        name = "RSI_DIVERGENCE" + i;
+                        break;
+                    }
+                }
+                IndicatorCandle = new RsiDivergence(_chartMaster.Name + name, true);
                 _chartMaster.CreateIndicator(IndicatorCandle, areaName);
             }
             if (_gridViewIndicators.SelectedCells[0].Value.ToString() == "ROC")

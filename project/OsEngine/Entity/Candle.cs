@@ -273,6 +273,21 @@ namespace OsEngine.Entity
             }
         }
 
+        public Candle PreviousCandle { get; set; }
+        public bool IsRSICalculated { get { return (AvgGain + AvgLoss) > 0; } }
+        public decimal RSI { get; set; }
+        public decimal AvgGain { get; set; }
+        public decimal AvgLoss { get; set; }
+        public decimal Gain { get { return PriceCloseChange > 0 ? PriceCloseChange : 0; } }
+        public decimal Loss { get { return PriceCloseChange < 0 ? Math.Abs(PriceCloseChange) : 0; } }
+        private decimal PriceCloseChange { get { return PreviousCandle != null ? Close - PreviousCandle.Close : 0; } }
+        public bool IsRSIPeakLow { get; set; }
+        public bool IsRSIPeakHigh { get; set; }
+        public bool IsUpDivergenceStart { get; set; }
+        public bool IsUpDivergenceEnd { get; set; }
+        public bool IsDownDivergenceStart { get; set; }
+        public bool IsDownDivergenceEnd { get; set; }
+
         /// <summary>
         /// to load the status of the candlestick from the line
         /// загрузить состояние свечи из строки
