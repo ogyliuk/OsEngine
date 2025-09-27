@@ -61,9 +61,15 @@ namespace OsEngine.Journal.Internal
             {
                 await Task.Delay(1000);
 
-                for (int i = 0; i < ControllersToCheck.Count; i++)
+                List<PositionController> controllersSnapshot;
+                lock (_positionPaintLocker)
                 {
-                    PositionController controller = ControllersToCheck[i];
+                    controllersSnapshot = new List<PositionController>(ControllersToCheck);
+                }
+
+                for (int i = 0; i < controllersSnapshot.Count; i++)
+                {
+                    PositionController controller = controllersSnapshot[i];
 
                     if (controller == null)
                     {
@@ -89,9 +95,12 @@ namespace OsEngine.Journal.Internal
 
             Activate();
 
-            ControllersToCheck.Add(this);
+            lock (_positionPaintLocker)
+            {
+                ControllersToCheck.Add(this);
+            }
 
-            if(_startProgram != StartProgram.IsOsOptimizer)
+            if (_startProgram != StartProgram.IsOsOptimizer)
             {
                 Load();
             }
@@ -224,21 +233,23 @@ namespace OsEngine.Journal.Internal
                     }
                 }
 
-                for (int i = 0; i < ControllersToCheck.Count; i++)
+                lock (_positionPaintLocker)
                 {
-                    if (ControllersToCheck[i] == null)
+                    for (int i = 0; i < ControllersToCheck.Count; i++)
                     {
-                        ControllersToCheck.RemoveAt(i);
-                        i--;
-                        continue;
-                    }
-                    if (ControllersToCheck[i]._name == _name)
-                    {
-                        ControllersToCheck.RemoveAt(i);
-                        return;
+                        if (ControllersToCheck[i] == null)
+                        {
+                            ControllersToCheck.RemoveAt(i);
+                            i--;
+                            continue;
+                        }
+                        if (ControllersToCheck[i]._name == _name)
+                        {
+                            ControllersToCheck.RemoveAt(i);
+                            return;
+                        }
                     }
                 }
-
             }
             catch (Exception error)
             {
@@ -1046,7 +1057,7 @@ namespace OsEngine.Journal.Internal
             }
         }
 
-        object _positionPaintLocker = new object();
+        private static readonly object _positionPaintLocker = new object();
 
         private List<Position> _positionsToPaint = new List<Position>();
 

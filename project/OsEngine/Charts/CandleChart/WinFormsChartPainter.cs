@@ -24,6 +24,7 @@ using OsEngine.Market;
 using Color = System.Drawing.Color;
 using Grid = System.Windows.Controls.Grid;
 using Rectangle = System.Windows.Shapes.Rectangle;
+using System.Diagnostics;
 
 namespace OsEngine.Charts.CandleChart
 {
@@ -757,6 +758,12 @@ namespace OsEngine.Charts.CandleChart
         {
             try
             {
+                Series existing = _chart.Series.FindByName(name);
+                if (existing != null)
+                {
+                    _chart.Series.Remove(existing);
+                }
+
                 ChartArea area = GetChartArea(areaName);
                 if (areaName == "RsiArea")
                 {
@@ -2977,11 +2984,6 @@ namespace OsEngine.Charts.CandleChart
             }
             try
             {
-                if (string.IsNullOrWhiteSpace(indicator.NameSeries) &&
-                    indicator.ValuesToChart != null)
-                {
-                    return;
-                }
                 if (_chart == null)
                 {
                     return;
@@ -2989,6 +2991,11 @@ namespace OsEngine.Charts.CandleChart
                 if (_chart.InvokeRequired)
                 {
                     _chart.Invoke(new Action<IIndicator>(PaintIndicator), indicator);
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(indicator.NameSeries) &&
+                    indicator.ValuesToChart != null)
+                {
                     return;
                 }
 
@@ -3013,9 +3020,25 @@ namespace OsEngine.Charts.CandleChart
 
                         if (isMultiElementIndicator)
                         {
-                            for (int i = 0; i < multiElementIndicator.Elements.Count; i++)
+                            // ИСПРАВЛЕНИЕ: создаём снимок коллекции Elements
+                            List<IndicatorElement> elementsSnapshot;
+                            while (true)
                             {
-                                IndicatorElement indicatorElement = multiElementIndicator.Elements[i];
+                                try
+                                {
+                                    elementsSnapshot = new List<IndicatorElement>(multiElementIndicator.Elements);
+                                    break;
+                                }
+                                catch (System.InvalidOperationException ex)
+                                {
+                                    // Коллекция изменилась во время перечисления, выходим
+                                    Console.WriteLine("Error of taking snapshot from multiElementIndicator.Elements : " + ex.Message);
+                                }
+                            }
+
+                            for (int i = 0; i < elementsSnapshot.Count; i++)
+                            {
+                                IndicatorElement indicatorElement = elementsSnapshot[i];
                                 if (indicatorElement.Type == IndicatorChartPaintType.LineSegments)
                                 {
                                     for (int j = 0; j < indicatorElement.ValuesToChart.Count; j++)
@@ -3073,16 +3096,32 @@ namespace OsEngine.Charts.CandleChart
                     }
                     if (isMultiElementIndicator)
                     {
-                        for (int i = 0; i < multiElementIndicator.Elements.Count; i++)
+                        // ИСПРАВЛЕНИЕ: создаём снимок коллекции Elements
+                        List<IndicatorElement> elementsSnapshot;
+                        while (true)
                         {
-                            IndicatorElement indicatorElement = multiElementIndicator.Elements[i];
+                            try
+                            {
+                                elementsSnapshot = new List<IndicatorElement>(multiElementIndicator.Elements);
+                                break;
+                            }
+                            catch (System.InvalidOperationException ex)
+                            {
+                                // Коллекция изменилась во время перечисления, выходим
+                                Console.WriteLine("Error of taking snapshot from multiElementIndicator.Elements : " + ex.Message);
+                            }
+                        }
+
+                        for (int i = 0; i < elementsSnapshot.Count; i++)
+                        {
+                            IndicatorElement indicatorElement = elementsSnapshot[i];
                             switch (indicatorElement.Type)
                             {
                                 case IndicatorChartPaintType.LineSegments:
-                                    List<Tuple<DataPoint, DataPoint>> listSegments = indicatorElement.ValuesToChart.Cast<Tuple<DataPoint, DataPoint>>().ToList();
+                                    List<ILineSegmentIndicatorChartValue> listSegments = indicatorElement.ValuesToChart.Cast<ILineSegmentIndicatorChartValue>().ToList();
                                     for (int j = 0; j < indicatorElement.ValuesToChart.Count; j++)
                                     {
-                                        PaintLikeLineSegment(listSegments[j], indicatorElement.Color, indicator.NameArea, String.Format("{0}{1}{2}", indicator.Name, i, j), indicatorElement.FullReloadOnNewCandle);
+                                        PaintLikeLineSegment(listSegments[j], String.Format("{0}{1}{2}", indicator.Name, i, j), indicatorElement.FullReloadOnNewCandle);
                                     }
                                     break;
                                 case IndicatorChartPaintType.Line:
@@ -3341,12 +3380,22 @@ namespace OsEngine.Charts.CandleChart
         /// draw indicator as a line
         /// прорисовать индикатор как отрезок
         /// </summary>
-        private void PaintLikeLineSegment(Tuple<DataPoint, DataPoint> segment, Color color, string areaName, string nameSeries, bool fullReloadOnNewCandle)
+        private void PaintLikeLineSegment(ILineSegmentIndicatorChartValue segment, string nameSeries, bool fullReloadOnNewCandle)
         {
+            if (_chart == null)
+            {
+                return;
+            }
+            if (_chart.InvokeRequired)
+            {
+                _chart.Invoke(new Action<ILineSegmentIndicatorChartValue, string, bool>(PaintLikeLineSegment), segment, nameSeries, fullReloadOnNewCandle);
+                return;
+            }
+
             Series mySeries = FindSeriesByNameSafe(nameSeries);
             if (mySeries == null)
             {
-                CreateSeries(areaName, IndicatorChartPaintType.LineSegments, nameSeries);
+                CreateSeries(segment.NameArea, IndicatorChartPaintType.LineSegments, nameSeries);
                 mySeries = FindSeriesByNameSafe(nameSeries);
                 if (mySeries == null)
                 {
@@ -3354,7 +3403,7 @@ namespace OsEngine.Charts.CandleChart
                 }
             }
 
-            if (segment == null || segment.Item1 == null || segment.Item2 == null)
+            if (segment == null || segment.PointFrom == null || segment.PointTo == null || !segment.Visible)
             {
                 mySeries.Points.Clear();
                 return;
@@ -3370,13 +3419,13 @@ namespace OsEngine.Charts.CandleChart
             {
                 // if only draw last point
                 // если прорисовываем только последнюю точку
-                PaintLikeLineSegmentLast(segment, nameSeries, color);
+                PaintLikeLineSegmentLast(segment, nameSeries, segment.Color);
             }
             else if (mySeries.Points.Count != 0 && mySeries.Points.Count == 2)
             {
                 // redraw last point
                 // перерисовываем последнюю точку
-                RePaintLikeLineSegmentLast(segment, nameSeries, color);
+                RePaintLikeLineSegmentLast(segment, nameSeries, segment.Color);
             }
             else
             {
@@ -3386,35 +3435,53 @@ namespace OsEngine.Charts.CandleChart
                 series.ChartType = SeriesChartType.Line;
                 series.YAxisType = AxisType.Secondary;
                 series.ChartArea = myArea.Name;
-                series.BorderWidth = 2;
+                series.BorderWidth = segment.LineWidth;
+                series.BorderDashStyle = segment.LineStyle;
                 series.ShadowOffset = 1;
                 series.YValuesPerPoint = 1;
-                series.Color = color;
-                series.Points.Add(segment.Item1);
-                series.Points.Add(segment.Item2);
+                series.Color = segment.Color;
+                series.Points.Add(segment.PointFrom);
+                series.Points.Add(segment.PointTo);
+                series.Tag = segment.LabelEnabled;
 
                 PaintSeriesSafe(series);
-                ReloadAreaSizes();
             }
-            ResizeYAxisOnArea(myArea.Name);
         }
 
-        private void PaintLikeLineSegmentLast(Tuple<DataPoint, DataPoint> segment, string nameSeries, Color color)
+        private void PaintLikeLineSegmentLast(ILineSegmentIndicatorChartValue segment, string nameSeries, Color color)
         {
+            if (_chart == null)
+            {
+                return;
+            }
+            if (_chart.InvokeRequired)
+            {
+                _chart.Invoke(new Action<ILineSegmentIndicatorChartValue, string, Color>(PaintLikeLineSegmentLast), segment, nameSeries, color);
+                return;
+            }
+
             Series mySeries = FindSeriesByNameSafe(nameSeries);
             mySeries.Color = color;
-            mySeries.Points.Add(segment.Item2);
-            RePaintRightLebels();
+            mySeries.Points.Add(segment.PointTo);
         }
 
-        private void RePaintLikeLineSegmentLast(Tuple<DataPoint, DataPoint> segment, string nameSeries, Color color)
+        private void RePaintLikeLineSegmentLast(ILineSegmentIndicatorChartValue segment, string nameSeries, Color color)
         {
+            if (_chart == null)
+            {
+                return;
+            }
+            if (_chart.InvokeRequired)
+            {
+                _chart.Invoke(new Action<ILineSegmentIndicatorChartValue, string, Color>(RePaintLikeLineSegmentLast), segment, nameSeries, color);
+                return;
+            }
+
             Series mySeries = FindSeriesByNameSafe(nameSeries);
             mySeries.Color = color;
-            DataPoint lastPoint = segment.Item2;
+            DataPoint lastPoint = segment.PointTo;
             mySeries.Points[mySeries.Points.Count - 1].YValues = lastPoint.YValues;
             mySeries.Points[mySeries.Points.Count - 1].IsEmpty = false;
-            RePaintRightLebels();
         }
 
         /// <summary>
@@ -3423,6 +3490,16 @@ namespace OsEngine.Charts.CandleChart
         /// </summary>
         private void PaintLikeLine(List<decimal> values, Color color, string nameSeries, bool fullReloadOnNewCandle)
         {
+            if (_chart == null)
+            {
+                return;
+            }
+            if (_chart.InvokeRequired)
+            {
+                _chart.Invoke(new Action<List<decimal>, Color, string, bool>(PaintLikeLine), values, color, nameSeries, fullReloadOnNewCandle);
+                return;
+            }
+
             Series mySeries = FindSeriesByNameSafe(nameSeries);
             if (mySeries == null)
             {
@@ -3507,6 +3584,16 @@ namespace OsEngine.Charts.CandleChart
         /// </summary>
         private void PaintLikeLineLast(List<decimal> values, string nameSeries, Color color)
         {
+            if (_chart == null)
+            {
+                return;
+            }
+            if (_chart.InvokeRequired)
+            {
+                _chart.Invoke(new Action<List<decimal>, string, Color>(PaintLikeLineLast), values, nameSeries, color);
+                return;
+            }
+
             Series mySeries = FindSeriesByNameSafe(nameSeries);
             mySeries.Color = color;
             decimal lastPoint = values[values.Count - 1];
@@ -3530,6 +3617,16 @@ namespace OsEngine.Charts.CandleChart
         /// </summary>
         private void RePaintLikeLineLast(List<decimal> values, string nameSeries, Color color)
         {
+            if (_chart == null)
+            {
+                return;
+            }
+            if (_chart.InvokeRequired)
+            {
+                _chart.Invoke(new Action<List<decimal>, string, Color>(RePaintLikeLineLast), values, nameSeries, color);
+                return;
+            }
+
             Series mySeries = FindSeriesByNameSafe(nameSeries);
             mySeries.Color = color;
             decimal lastPoint = Convert.ToDecimal(values[values.Count - 1]);
@@ -4628,8 +4725,8 @@ namespace OsEngine.Charts.CandleChart
                 {
                     Series series = mySeries[i2];
 
-                    if (series.Points.Count == 0 ||
-                        series.ChartType == SeriesChartType.Point)
+                    bool labelShouldBePainted = series.Tag == null || (series.Tag is bool && (bool)series.Tag);
+                    if (series.Points.Count == 0 || series.ChartType == SeriesChartType.Point || !labelShouldBePainted)
                     {
                         continue;
                     }
@@ -4676,7 +4773,7 @@ namespace OsEngine.Charts.CandleChart
                 }
             }
         }
-        
+
         void _chart_AxisViewChanging(object sender, ViewEventArgs e)
         {
             RePaintRightLebels();

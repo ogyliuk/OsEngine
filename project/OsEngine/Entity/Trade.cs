@@ -17,6 +17,8 @@ namespace OsEngine.Entity
         // standard part
         // стандартная часть
 
+        public TimeFrame? TimeFrame { get; set; }
+
         /// <summary>
         /// instrument code for which the transaction took place
         /// код инструмента по которому прошла сделка

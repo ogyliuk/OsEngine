@@ -16,6 +16,7 @@ using Microsoft.Win32;
 using OsEngine.Alerts;
 using OsEngine.Language;
 using OsEngine.Market;
+using OsEngine.OlegTools;
 using OsEngine.OsConverter;
 using OsEngine.OsData;
 using OsEngine.OsMiner;
@@ -48,6 +49,12 @@ namespace OsEngine
 
         public MainWindow()
         {
+            if (false)
+            {
+                EquityDrawer.DoJob();
+                return;
+            }
+
             Process ps = Process.GetCurrentProcess();
             ps.PriorityClass = ProcessPriorityClass.RealTime;
 

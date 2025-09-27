@@ -15,6 +15,8 @@ namespace OsEngine.Entity
     /// </summary>
     public class Candle
     {
+        public TimeFrame TimeFrame;
+
         /// <summary>
         /// candle start time
         /// время начала свечи
@@ -273,20 +275,11 @@ namespace OsEngine.Entity
             }
         }
 
+        // Some properties needed for RSI indicator
         public Candle PreviousCandle { get; set; }
-        public bool IsRSICalculated { get { return (AvgGain + AvgLoss) > 0; } }
-        public decimal RSI { get; set; }
-        public decimal AvgGain { get; set; }
-        public decimal AvgLoss { get; set; }
         public decimal Gain { get { return PriceCloseChange > 0 ? PriceCloseChange : 0; } }
         public decimal Loss { get { return PriceCloseChange < 0 ? Math.Abs(PriceCloseChange) : 0; } }
         private decimal PriceCloseChange { get { return PreviousCandle != null ? Close - PreviousCandle.Close : 0; } }
-        public bool IsRSIPeakLow { get; set; }
-        public bool IsRSIPeakHigh { get; set; }
-        public bool IsUpDivergenceStart { get; set; }
-        public bool IsUpDivergenceEnd { get; set; }
-        public bool IsDownDivergenceStart { get; set; }
-        public bool IsDownDivergenceEnd { get; set; }
 
         /// <summary>
         /// to load the status of the candlestick from the line
@@ -295,8 +288,8 @@ namespace OsEngine.Entity
         /// <param name="In">status line/строка состояния</param>
         public void SetCandleFromString(string In)
         {
-//20131001,100000,97.8000000,97.9900000,97.7500000,97.9000000,1
-            //<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOLUME>
+            //20131001,100000,97.8000000,97.9900000,97.7500000,97.9000000,1,0.97,min5
+            //<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOLUME>,<BODY%>,<TIMEFRAME>
             string[] sIn = In.Split(',');
 
             int year = Convert.ToInt32(sIn[0].Substring(0, 4));
@@ -322,6 +315,13 @@ namespace OsEngine.Entity
             {
                 Volume = 1;
             }
+
+            if (sIn.Length < 9)
+            {
+                throw new Exception("Can't load candle without timeframe info!");
+            }
+
+            TimeFrame = sIn[8].FromTimeFrameString();
         }
 
         /// <summary>
@@ -430,8 +430,8 @@ namespace OsEngine.Entity
 
                 _stringToSave = "";
 
-                //20131001,100000,97.8000000,97.9900000,97.7500000,97.9000000,1,0.97
-                //<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOLUME>,<BODY%>
+                //20131001,100000,97.8000000,97.9900000,97.7500000,97.9000000,1,0.97,min5
+                //<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOLUME>,<BODY%>,<TIMEFRAME>
 
                 string result = "";
                 result += TimeStart.ToString("yyyyMMdd,HHmmss") + ",";
@@ -441,7 +441,8 @@ namespace OsEngine.Entity
                 result += Low.ToString(CultureInfo.InvariantCulture) + ",";
                 result += Close.ToString(CultureInfo.InvariantCulture) + ",";
                 result += Volume.ToString(CultureInfo.InvariantCulture) + ",";
-                result += BodyPercent.ToString(CultureInfo.InvariantCulture);
+                result += BodyPercent.ToString(CultureInfo.InvariantCulture) + ",";
+                result += TimeFrame.ToString();
 
                 _stringToSave = result;
 

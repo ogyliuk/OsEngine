@@ -2675,6 +2675,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 Position newDeal = _dealCreator.CreatePosition(TabName, direction, price, volume, priceType,
                     timeLife, Securiti, Portfolio, StartProgram);
+                newDeal.TimeFrame = this.TimeFrameBuilder.TimeFrame;
                 newDeal.OpenOrders[0].IsStopOrProfit = isStopOrProfit;
                 newDeal.SignalTypeOpen = signalType;
                 _journal.SetNewDeal(newDeal);
@@ -2794,6 +2795,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 Position newDeal = _dealCreator.CreatePosition(TabName, direction, price, volume, priceType,
                     timeLife, Securiti, Portfolio, StartProgram);
+                newDeal.TimeFrame = this.TimeFrameBuilder.TimeFrame;
                 newDeal.OpenOrders[0].IsStopOrProfit = isStopOrProfit;
                 newDeal.SignalTypeOpen = signalType;
                 _journal.SetNewDeal(newDeal);
@@ -4237,13 +4239,25 @@ namespace OsEngine.OsTrader.Panels.Tab
                 {
                     for (int i2 = 0; i < openPositions.Count && i2 < newTrades.Count; i2++)
                     {
-                        if (CheckStop(openPositions[i], newTrades[i2].Price))
+                        if (!openPositions[i].TimeFrame.HasValue)
                         {
-                            if (StartProgram != StartProgram.IsOsTrader)
+                            throw new Exception("POSITION has NO TimeFrame defined!");
+                        }
+                        if (!newTrades[i2].TimeFrame.HasValue)
+                        {
+                            throw new Exception("TRADE has NO TimeFrame defined!");
+                        }
+
+                        if (openPositions[i].TimeFrame.Value == newTrades[i2].TimeFrame.Value)
+                        {
+                            if (CheckStop(openPositions[i], newTrades[i2].Price))
                             {
-                                i--;
+                                if (StartProgram != StartProgram.IsOsTrader)
+                                {
+                                    i--;
+                                }
+                                break;
                             }
-                            break;
                         }
                     }
                 }

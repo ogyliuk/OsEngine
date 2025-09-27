@@ -7,6 +7,7 @@ using OsEngine.Market;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace OsEngine.Entity
@@ -445,7 +446,11 @@ namespace OsEngine.Entity
                         price += volumeEx * _openOrders[i].PriceReal;
                     }
                 }
-                if (volume == 0)
+                if (
+                    volume == 0 ||
+                    // NOTE : This (return init price when LIMIT order) was added to avoid random price when backtesting, it can be harmful for real trading!
+                    _openOrders.All(o => o.TypeOrder == OrderPriceType.Limit)
+                    )
                 {
                     return _openOrders[0].Price;
                 }
@@ -480,6 +485,13 @@ namespace OsEngine.Entity
                     }
 
                 }
+
+                // NOTE : This (return init price when LIMIT order) was added to avoid random price when backtesting, it can be harmful for real trading!
+                if (_closeOrders.All(o => o.TypeOrder == OrderPriceType.Limit))
+                {
+                    return _closeOrders[0].Price;
+                }
+
                 if (volume == 0)
                 {
                     return 0;
@@ -911,6 +923,8 @@ namespace OsEngine.Entity
             State = state;
         }
 
+        public TimeFrame? TimeFrame { get; set; }
+
         /// <summary>
         /// position creation time
         /// время создания позиции
@@ -1020,6 +1034,10 @@ namespace OsEngine.Entity
         /// </summary>
         public decimal ComissionValue;
 
+        public decimal? EP_FeePercent;
+        public decimal? TP_FeePercent;
+        public decimal? SL_FeePercent;
+
         /// <summary>
         /// the amount of profit relative to the portfolio in absolute terms
         /// количество прибыли относительно портфеля в абсолютном выражении, С УЧЁТОМ КОМИССИИ И СТОИМОСТЕЙ ШАГА ЦЕНЫ
@@ -1101,26 +1119,30 @@ namespace OsEngine.Entity
 
             if (ComissionType != ComissionType.None && ComissionValue != 0)
             {
-                if (ComissionType == ComissionType.Percent)
-                {
-                    if (EntryPrice != 0 && ClosePrice == 0)
-                    {
-                        commissionTotal = MaxVolume * EntryPrice * (ComissionValue / 100);
-                    }
-                    else if (EntryPrice != 0 && ClosePrice != 0)
-                    {
-                        commissionTotal = MaxVolume * EntryPrice * (ComissionValue / 100) +
-                                          MaxVolume * ClosePrice * (ComissionValue / 100);
-                    }
-                }
+                decimal entryFeePercent, closeFeePercent;
+                GetFeePercentValues(out entryFeePercent, out closeFeePercent);
 
-                if (ComissionType == ComissionType.OneLotFix)
+                bool position_IN_PROGRESS = EntryPrice != 0 && ClosePrice == 0;
+                bool position_FINISHED = EntryPrice != 0 && ClosePrice != 0;
+
+                if (position_IN_PROGRESS)
                 {
-                    if (EntryPrice != 0 && ClosePrice == 0)
+                    if (ComissionType == ComissionType.Percent)
+                    {
+                        commissionTotal = MaxVolume * EntryPrice * (entryFeePercent / 100);
+                    }
+                    else if (ComissionType == ComissionType.OneLotFix)
                     {
                         commissionTotal = MaxVolume * ComissionValue;
                     }
-                    else if (EntryPrice != 0 && ClosePrice != 0)
+                }
+                else if (position_FINISHED)
+                {
+                    if (ComissionType == ComissionType.Percent)
+                    {
+                        commissionTotal = MaxVolume * EntryPrice * (entryFeePercent / 100) + MaxVolume * ClosePrice * (closeFeePercent / 100);
+                    }
+                    else if (ComissionType == ComissionType.OneLotFix)
                     {
                         commissionTotal = MaxVolume * ComissionValue * 2;
                     }
@@ -1128,6 +1150,19 @@ namespace OsEngine.Entity
             }
 
             return commissionTotal;
+        }
+
+        private void GetFeePercentValues(out decimal entryFeePercent, out decimal closeFeePercent)
+        {
+            entryFeePercent = ComissionValue;
+            closeFeePercent = ComissionValue;
+            bool customFeePercentsDefined = this.EP_FeePercent.HasValue && this.TP_FeePercent.HasValue && this.SL_FeePercent.HasValue;
+            if (customFeePercentsDefined)
+            {
+                entryFeePercent = this.EP_FeePercent.Value;
+                bool closedBySL = Direction == Side.Buy ? ClosePrice < EntryPrice : ClosePrice > EntryPrice;
+                closeFeePercent = closedBySL ? this.SL_FeePercent.Value : this.TP_FeePercent.Value;
+            }
         }
 
         /// <summary>

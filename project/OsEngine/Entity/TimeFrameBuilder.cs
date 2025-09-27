@@ -623,4 +623,29 @@ namespace OsEngine.Entity
         Day
     }
 
+    public static class TimeFrameExtensions
+    {
+        public static TimeFrame FromTimeFrameString(this string timeFrameString)
+        {
+            TimeFrame timeFrame;
+            if (!Enum.TryParse<TimeFrame>(timeFrameString, out timeFrame))
+            {
+                if (timeFrameString == "1m") timeFrame = TimeFrame.Min1;
+                else if (timeFrameString == "2m") timeFrame = TimeFrame.Min2;
+                else if (timeFrameString == "3m") timeFrame = TimeFrame.Min3;
+                else if (timeFrameString == "5m") timeFrame = TimeFrame.Min5;
+                else if (timeFrameString == "10m") timeFrame = TimeFrame.Min10;
+                else if (timeFrameString == "15m") timeFrame = TimeFrame.Min15;
+                else if (timeFrameString == "20m") timeFrame = TimeFrame.Min20;
+                else if (timeFrameString == "30m") timeFrame = TimeFrame.Min30;
+                else if (timeFrameString == "45m") timeFrame = TimeFrame.Min45;
+                else if (timeFrameString == "1h") timeFrame = TimeFrame.Hour1;
+                else if (timeFrameString == "2h") timeFrame = TimeFrame.Hour2;
+                else if (timeFrameString == "4h") timeFrame = TimeFrame.Hour4;
+                else if (timeFrameString == "1d") timeFrame = TimeFrame.Day;
+                else throw new Exception("Unknown TIME FRAME string!");
+            }
+            return timeFrame;
+        }
+    }
 }

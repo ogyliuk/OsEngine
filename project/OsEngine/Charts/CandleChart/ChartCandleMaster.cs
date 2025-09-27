@@ -377,8 +377,9 @@ namespace OsEngine.Charts.CandleChart
                     {
                         for (int i = 0; i < _indicators.Count; i++)
                         {
-                            if (_indicators[i].ValuesToChart != null &&
-                                _indicators[i].ValuesToChart.Count != 0)
+                            IMultiElementIndicator multiElementIndicator = _indicators[i] as IMultiElementIndicator;
+                            bool isMultiElementIndicator = _indicators[i].TypeIndicator == IndicatorChartPaintType.MultiElement && multiElementIndicator != null;
+                            if ((_indicators[i].ValuesToChart != null && _indicators[i].ValuesToChart.Count != 0) || isMultiElementIndicator)
                             {
                                 writer.WriteLine(_indicators[i].GetType().Name + "@" +
                                                  _indicators[i].Name + "@" + _indicators[i].NameArea +

@@ -243,6 +243,8 @@
     <Compile Include="Charts\CandleChart\Indicators\ForceIndexUi.xaml.cs">
       <DependentUpon>ForceIndexUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Charts\CandleChart\Indicators\IIndicatorChartValue.cs" />
+    <Compile Include="Charts\CandleChart\Indicators\ILineSegmentIndicatorChartValue.cs" />
     <Compile Include="Charts\CandleChart\Indicators\RsiDivergence.cs" />
     <Compile Include="Charts\CandleChart\Indicators\RsiDivergenceUi.xaml.cs">
       <DependentUpon>RsiDivergenceUi.xaml</DependentUpon>
@@ -798,6 +800,7 @@
     <Compile Include="Market\Services\CandlesCreator.cs" />
     <Compile Include="Market\Services\RestChannel.cs" />
     <Compile Include="Market\Services\WsSource.cs" />
+    <Compile Include="OlegTools\EquityDrawer.cs" />
     <Compile Include="OlegUtils.cs" />
     <Compile Include="OsConverter\OsCandleConverterUi.xaml.cs">
       <DependentUpon>OsCandleConverterUi.xaml</DependentUpon>
@@ -1703,6 +1706,7 @@
     <EmbeddedResource Include="Resources\OsEngine_logo_transpared.png" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="OlegTools\EquityDrawerData.txt" />
     <Resource Include="APIsToConsume.txt" />
     <Content Include="lua\clibs\lua51.dll" />
     <Content Include="lua\clibs\socket\core.dll" />

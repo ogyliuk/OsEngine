@@ -412,7 +412,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
         /// </summary>
         /// <param name="jsonCandles"></param>
         /// <returns></returns>
-        private List<Candle> _deserializeCandles(string jsonCandles)
+        private List<Candle> _deserializeCandles(string jsonCandles, string timeframe)
         {
             try
             {
@@ -445,6 +445,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                             newCandle.Open = Convert.ToDecimal(param[1].Replace(",", CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator).Trim(new char[] { '"', '"' }), CultureInfo.InvariantCulture);
                             newCandle.Close = Convert.ToDecimal(param[4].Replace(",", CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator).Trim(new char[] { '"', '"' }), CultureInfo.InvariantCulture);
                             newCandle.Volume = Convert.ToDecimal(param[5].Replace(",", CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator).Trim(new char[] { '"', '"' }), CultureInfo.InvariantCulture);
+                            newCandle.TimeFrame = timeframe.FromTimeFrameString();
 
                             _candles.Add(newCandle);
                         }
@@ -459,6 +460,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                             newCandle.Open = Convert.ToDecimal(param[1].Replace(",", CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator).Trim(new char[] { '"', '"' }), CultureInfo.InvariantCulture);
                             newCandle.Close = Convert.ToDecimal(param[4].Replace(",", CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator).Trim(new char[] { '"', '"' }), CultureInfo.InvariantCulture);
                             newCandle.Volume = Convert.ToDecimal(param[5].Replace(",", CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator).Trim(new char[] { '"', '"' }), CultureInfo.InvariantCulture);
+                            newCandle.TimeFrame = timeframe.FromTimeFrameString();
 
                             _candles.Add(newCandle);
                         }
@@ -540,7 +542,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     return null;
                 }
 
-                var candles = _deserializeCandles(res);
+                var candles = _deserializeCandles(res, needTf);
                 return candles;
 
             }
@@ -551,7 +553,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=1m" + "&startTime=" + startTime + "&endTime=" + endTime);
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
 
                     var newCandles = BuildCandles(candles, 2, 1);
                     return newCandles;
@@ -561,7 +563,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=5m" + "&startTime=" + startTime + "&endTime=" + endTime);
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
                     var newCandles = BuildCandles(candles, 10, 5);
                     return newCandles;
                 }
@@ -570,7 +572,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=5m" + "&startTime=" + startTime + "&endTime=" + endTime);
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
                     var newCandles = BuildCandles(candles, 20, 5);
                     return newCandles;
                 }
@@ -579,7 +581,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=15m" + "&startTime=" + startTime + "&endTime=" + endTime);
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
                     var newCandles = BuildCandles(candles, 45, 15);
                     return newCandles;
                 }
@@ -701,7 +703,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
 
                 var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
 
-                var candles = _deserializeCandles(res);
+                var candles = _deserializeCandles(res, needTf);
                 return candles;
 
             }
@@ -712,7 +714,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=1m");
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
 
                     var newCandles = BuildCandles(candles, 2, 1);
                     return newCandles;
@@ -722,7 +724,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=5m");
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
                     var newCandles = BuildCandles(candles, 10, 5);
                     return newCandles;
                 }
@@ -731,7 +733,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=5m");
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
                     var newCandles = BuildCandles(candles, 20, 5);
                     return newCandles;
                 }
@@ -740,7 +742,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     var param = new Dictionary<string, string>();
                     param.Add("symbol=" + nameSec.ToUpper(), "&interval=15m");
                     var res = CreateQuery(BinanceExchangeType.SpotExchange, Method.GET, endPoint, param, false);
-                    var candles = _deserializeCandles(res);
+                    var candles = _deserializeCandles(res, needTf);
                     var newCandles = BuildCandles(candles, 45, 15);
                     return newCandles;
                 }
